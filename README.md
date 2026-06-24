@@ -1,3 +1,381 @@
+# battery-thermal-cuda
+
+GPU-Accelerated Battery Thermal Propagation Simulator using CUDA with Global Memory, Shared Memory, and Halo Optimization.
+
+---
+
+## Overview
+
+`battery-thermal-cuda` is a CUDA-based framework for simulating heat propagation inside batteries using finite-difference stencil methods. The battery is represented as a two-dimensional thermal domain, where each computational cell stores the local temperature.
+
+The framework investigates different GPU memory optimization techniques and compares them against CPU execution. Dynamic heat sources are derived from the NASA battery dataset, enabling realistic time-varying thermal behavior.
+
+The project supports:
+
+* CPU thermal solver
+* Global Memory GPU kernel
+* Shared Memory tiled kernel
+* Halo-region optimized kernel
+* Constant and dynamic heat sources
+* NASA battery dataset integration
+* Performance benchmarking
+* GFLOPS and bandwidth analysis
+* Roofline analysis
+* Nsight Compute profiling
+* Thermal map generation
+
+The framework serves as a foundation for future:
+
+* Electro-thermal battery models
+* Battery Digital Twins
+* Multi-GPU halo exchange
+* SOC and SOH estimation
+* AI surrogate models
+
+---
+
+# Physics Model
+
+## Battery Heat Generation
+
+Heat generation is modeled using Joule heating:
+
+```math
+Q = I^2R
+```
+
+where
+
+* (I) = Battery current (A)
+* (R) = Internal resistance (Ω)
+* (Q) = Generated heat (W)
+
+For dynamic simulations, current values are obtained from the NASA battery dataset:
+
+```math
+Q(t)=I(t)^2R
+```
+
+---
+
+## Transient Heat Equation
+
+Heat diffusion inside the battery is governed by
+
+```math
+\frac{\partial T}{\partial t}
+=
+\alpha
+\left(
+\frac{\partial^2T}{\partial x^2}
++
+\frac{\partial^2T}{\partial y^2}
+\right)
++
+Q
+```
+
+where
+
+* (T) = Temperature
+* (\alpha) = Thermal diffusivity
+* (Q) = Heat source
+
+Using finite differences, the update equation becomes
+
+```math
+T_{i,j}^{n+1}
+=
+T_{i,j}^{n}
++
+\alpha
+\left(
+T_{i-1,j}
++
+T_{i+1,j}
++
+T_{i,j-1}
++
+T_{i,j+1}
+-
+4T_{i,j}
+\right)
++
+\beta Q
+```
+
+---
+
+# Battery Thermal Domain Representation
+
+The battery is discretized into an (N \times N) thermal grid.
+
+```text
+        Battery Cross Section
+
+        ┌────────────────────┐
+        │                    │
+        │    Thermal Grid    │
+        │                    │
+        │      256×256       │
+        │                    │
+        └────────────────────┘
+```
+
+Each grid cell represents a small region of the battery.
+
+## Grid Resolution
+
+| Grid Size | Number of Cells |
+| --------- | --------------: |
+| 256×256   |          65,536 |
+| 512×512   |         262,144 |
+| 1024×1024 |       1,048,576 |
+| 2048×2048 |       4,194,304 |
+
+Larger grids provide finer thermal resolution and improved accuracy.
+
+---
+
+# Heat Stencil
+
+Each grid point exchanges heat with four neighboring cells.
+
+```text
+        Top
+         ↑
+Left ← Center → Right
+         ↓
+      Bottom
+```
+
+---
+
+# GPU Mapping
+
+Each grid cell is mapped to one CUDA thread.
+
+```text
+1 Battery Region
+       ↓
+1 Grid Cell
+       ↓
+1 CUDA Thread
+       ↓
+Temperature Update
+```
+
+For a 2048×2048 grid:
+
+* Total cells = 4,194,304
+* Total CUDA threads ≈ 4.2 million
+
+---
+
+# GPU Kernels
+
+## Global Memory GPU
+
+Neighbor values are accessed directly from global memory.
+
+```text
+Global Memory
+      ↓
+    Thread
+      ↓
+   Compute
+```
+
+---
+
+## Shared Memory GPU
+
+Tiles are loaded into shared memory to reduce global memory accesses.
+
+```text
+Global Memory
+      ↓
+ Shared Tile
+      ↓
+   Threads
+      ↓
+   Compute
+```
+
+---
+
+## Halo GPU
+
+Halo cells are loaded around each tile to maximize memory locality and bandwidth utilization.
+
+```text
+Global Memory
+       ↓
+ Shared Tile + Halo
+       ↓
+      Threads
+       ↓
+      Compute
+```
+
+---
+
+# Project Structure
+
+```text
+battery-thermal-cuda
+│
+├── include
+│   ├── config.h
+│   ├── benchmark.h
+│   ├── kernels.h
+│   ├── metrics.h
+│   ├── thermal_map.h
+│   ├── utils.h
+│   └── cuda_events.h
+│
+├── src
+│   ├── main.cu
+│   ├── config.cu
+│   ├── benchmark_cpu.cu
+│   ├── benchmark_gpu.cu
+│   ├── benchmark_tiled.cu
+│   ├── benchmark_halo.cu
+│   ├── metrics.cu
+│   ├── thermal_map.cu
+│   ├── utils.cu
+│   └── cuda_events.cu
+│
+├── kernels
+│   ├── gpu_stencil.cu
+│   ├── tiled_stencil.cu
+│   └── halo_stencil.cu
+│
+├── data
+│   └── battery_dataset.csv
+│
+├── results
+│   ├── results.csv
+│   ├── center_temp.csv
+│   └── thermal_map.csv
+│
+├── plots
+│   ├── speedup.png
+│   ├── bandwidth.png
+│   ├── roofline.png
+│   └── thermal_map.png
+│
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+---
+
+# Build
+
+Compile:
+
+```bash
+nvcc \
+-Iinclude \
+src/*.cu \
+kernels/*.cu \
+-o thermal
+```
+
+---
+
+# Run
+
+```bash
+./thermal
+```
+
+---
+
+# Nsight Compute Profiling
+
+Compile:
+
+```bash
+nvcc -lineinfo \
+-Iinclude \
+src/*.cu \
+kernels/*.cu \
+-o thermal
+```
+
+Profile:
+
+```bash
+ncu --set full ./thermal
+```
+
+Metrics analyzed:
+
+* Occupancy
+* Warp efficiency
+* Memory throughput
+* L1 cache utilization
+* L2 cache utilization
+* Shared memory utilization
+
+---
+
+# Performance Metrics
+
+The framework reports:
+
+* Runtime
+* Speedup
+* GFLOPS
+* Effective memory bandwidth
+
+Typical speedup:
+
+| Grid Size | GPU Speedup | Halo Speedup |
+| --------- | ----------: | -----------: |
+| 256×256   |        107× |          84× |
+| 512×512   |        160× |          97× |
+| 1024×1024 |        170× |         203× |
+| 2048×2048 |        202× |         227× |
+
+---
+
+# Roofline Characteristics
+
+Arithmetic Intensity
+
+```text
+AI ≈ 0.29 FLOP/Byte
+```
+
+The stencil kernel is primarily memory-bandwidth limited, making shared-memory and halo optimizations highly effective.
+
+---
+
+# Future Work
+
+Temperature-dependent resistance:
+
+```math
+R(T)=R_0(1+\alpha(T-T_0))
+```
+
+Planned extensions:
+
+* Electro-thermal coupling
+* SOC estimation
+* SOH estimation
+* Multi-GPU halo exchange
+* CUDA streams
+* NVLink optimization
+* Battery Digital Twin
+* AI surrogate models
+* Tensor Core acceleration
+
+---
 # Performance Results
 
 The framework reports runtime, speedup, computational throughput (GFLOPS), and effective memory bandwidth for CPU, Global GPU, Shared GPU, and Halo GPU implementations.
@@ -64,3 +442,26 @@ The experimental results demonstrate that:
 * Halo optimization delivers the highest GFLOPS and memory bandwidth.
 * Performance scales with increasing grid sizes, making the framework suitable for large-scale battery thermal simulations.
 * The developed framework provides a foundation for future multi-GPU battery digital twins and electro-thermal simulations.
+
+# License
+
+MIT License
+
+---
+
+# Author
+
+**Vallinath S**
+
+PGD-AI, IIT Jodhpur
+
+📧 [g25ait1184@iitj.ac.in](mailto:g25ait1184@iitj.ac.in)
+
+### Areas of Interest
+
+* CUDA Programming
+* GPU Computing
+* Battery Management Systems
+* Embedded Systems
+* Battery Digital Twin
+* AI for Energy Storage Systems
