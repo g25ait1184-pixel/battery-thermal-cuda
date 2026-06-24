@@ -9,22 +9,48 @@ Config initConfig()
     //--------------------------------------
 
     cfg.heatMode =
-    static_cast<HeatMode>(
-        HEAT_MODE
-    );
+        static_cast<HeatMode>(
+            HEAT_MODE
+        );
 
-    // cfg.heatMode = CONSTANT_Q;
 
     //--------------------------------------
     // Execution Mode
     //--------------------------------------
 
-    cfg.execMode =
-    static_cast<ExecMode>(
-        EXEC_MODE
-    );
+#if EXEC_MODE == NORMAL_EXECUTION
 
-    // cfg.execMode = NSIGHT_MODE;
+    cfg.execMode = NORMAL_MODE;
+
+#elif EXEC_MODE == NSIGHT_EXECUTION
+
+    cfg.execMode = NSIGHT_MODE;
+
+#else
+
+    cfg.execMode = PROFILE_MODE;
+
+#endif
+
+
+    //--------------------------------------
+    // Kernel Selection
+    //--------------------------------------
+
+#if PROFILE_KERNEL == PROFILE_GPU_KERNEL
+
+    cfg.kernelMode = GPU_KERNEL;
+
+#elif PROFILE_KERNEL == PROFILE_TILED_KERNEL
+
+    cfg.kernelMode = TILED_KERNEL;
+
+#else
+
+    cfg.kernelMode = HALO_KERNEL;
+
+#endif
+
 
     //--------------------------------------
     // Physics
@@ -38,22 +64,12 @@ Config initConfig()
 
     cfg.current = 20.0f;
 
+
     //--------------------------------------
-    // Benchmark Configuration
+    // NORMAL MODE
     //--------------------------------------
 
-    if(cfg.execMode == NSIGHT_MODE)
-    {
-        cfg.RUNS = 1;
-
-        cfg.steps = 1;
-
-        cfg.sizes =
-        {
-            2048
-        };
-    }
-    else
+    if(cfg.execMode == NORMAL_MODE)
     {
         cfg.RUNS = 20;
 
@@ -66,7 +82,54 @@ Config initConfig()
             1024,
             2048
         };
+
+        cfg.saveCSV = true;
+
+        cfg.savePlots = true;
     }
+
+
+    //--------------------------------------
+    // NSIGHT MODE
+    //--------------------------------------
+
+    else if(cfg.execMode == NSIGHT_MODE)
+    {
+        cfg.RUNS = 1;
+
+        cfg.steps = 1;
+
+        cfg.sizes =
+        {
+            2048
+        };
+
+        cfg.saveCSV = false;
+
+        cfg.savePlots = false;
+    }
+
+
+    //--------------------------------------
+    // PROFILE SINGLE KERNEL MODE
+    //--------------------------------------
+
+    else
+    {
+        cfg.RUNS = 1;
+
+        cfg.steps = 1;
+
+        cfg.sizes =
+        {
+            2048
+        };
+
+        cfg.saveCSV = false;
+
+        cfg.savePlots = false;
+    }
+
 
     //--------------------------------------
     // Thermal Map

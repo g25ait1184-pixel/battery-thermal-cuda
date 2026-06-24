@@ -432,6 +432,23 @@ Peak memory bandwidth:
 | Halo GPU   |                635.20 |
 
 ---
+## Nsight Compute Profiling (Halo Kernel)
+
+The Halo kernel was profiled using **NVIDIA Nsight Compute**. The profiling results indicate high occupancy, excellent warp execution efficiency, and effective cache utilization.
+
+| Metric                    |                       Halo |
+| ------------------------- | -------------------------: |
+| Runtime                   |                  337.89 μs |
+| Achieved Occupancy        |                     87.9 % |
+| DRAM Throughput           |               39.67 % Peak |
+| Memory Throughput         |               59.76 % Peak |
+| L2 Cache Hit Rate         |                     76.6 % |
+| Warp Execution Efficiency |                     99.9 % |
+| Registers / Thread        |                         20 |
+| Shared Memory / Block     |                     1.3 KB |
+| Dominant Stall Reason     | No Eligible Warps (74.48%) |
+
+The results show that the Halo kernel achieves high occupancy and near-perfect warp execution efficiency while benefiting from effective L2 cache reuse. The primary performance bottleneck is the lack of eligible warps available to hide latency, indicating that further improvements may be obtained through increased instruction-level parallelism or additional memory access overlap.
 
 ## Summary
 

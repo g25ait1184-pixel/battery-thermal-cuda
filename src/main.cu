@@ -17,8 +17,7 @@ int main()
     // Configuration
     //------------------------------------------------
 
-    Config cfg =
-        initConfig();
+    Config cfg = initConfig();
 
     //------------------------------------------------
     // Heat Profile
@@ -54,10 +53,8 @@ int main()
     else
     {
         float Q =
-            cfg.current
-            *
-            cfg.current
-            *
+            cfg.current *
+            cfg.current *
             cfg.resistance;
 
         heatProfile.push_back(
@@ -84,10 +81,16 @@ int main()
         << "Execution Mode : NORMAL"
         << endl;
     }
-    else
+    else if(cfg.execMode == NSIGHT_MODE)
     {
         cout
         << "Execution Mode : NSIGHT"
+        << endl;
+    }
+    else
+    {
+        cout
+        << "Execution Mode : PROFILE"
         << endl;
     }
 
@@ -101,22 +104,23 @@ int main()
     // Results
     //------------------------------------------------
 
-    vector<int>
-    gridSizes;
+    vector<int> gridSizes;
 
-    vector<Metrics>
-    results;
+    vector<Metrics> results;
 
     //------------------------------------------------
     // Header
     //------------------------------------------------
 
-    cout
-    << "\nGrid,CPU(ms),GPU(ms),Tiled(ms),Halo(ms),"
-    << "GPU Speedup,Tiled Speedup,Halo Speedup,"
-    << "GPU GFLOPS,Tiled GFLOPS,Halo GFLOPS,"
-    << "GPU BW(GB/s),Tiled BW(GB/s),Halo BW(GB/s)"
-    << endl;
+    if(cfg.execMode == NORMAL_MODE)
+    {
+        cout
+        << "\nGrid,CPU(ms),GPU(ms),Tiled(ms),Halo(ms),"
+        << "GPU Speedup,Tiled Speedup,Halo Speedup,"
+        << "GPU GFLOPS,Tiled GFLOPS,Halo GFLOPS,"
+        << "GPU BW(GB/s),Tiled BW(GB/s),Halo BW(GB/s)"
+        << endl;
+    }
 
     //------------------------------------------------
     // Benchmark Loop
@@ -124,15 +128,8 @@ int main()
 
     for(auto N : cfg.sizes)
     {
-        //--------------------------------------------
-        // Initialize Grid
-        //--------------------------------------------
-
-        vector<float>
-        T;
-
-        vector<float>
-        Tnew;
+        vector<float> T;
+        vector<float> Tnew;
 
         initializeGrid(
             T,
@@ -140,137 +137,199 @@ int main()
             N
         );
 
-        //--------------------------------------------
-        // Simulation Information
-        //--------------------------------------------
-
         printSimulationInfo(
             N,
             heatProfile,
             cfg
         );
 
+        double cpu_ms   = 0.0;
+        double gpu_ms   = 0.0;
+        double tiled_ms = 0.0;
+        double halo_ms  = 0.0;
+
         //--------------------------------------------
-        // CPU
+        // NORMAL MODE
         //--------------------------------------------
 
-        double cpu_ms =
-            benchmarkCPU(
-                cfg,
-                N,
-                T,
-                Tnew,
-                heatProfile
+        if(cfg.execMode == NORMAL_MODE)
+        {
+            cpu_ms =
+                benchmarkCPU(
+                    cfg,
+                    N,
+                    T,
+                    Tnew,
+                    heatProfile
+                );
+
+            gpu_ms =
+                benchmarkGPU(
+                    cfg,
+                    N,
+                    T,
+                    heatProfile
+                );
+
+            tiled_ms =
+                benchmarkTiled(
+                    cfg,
+                    N,
+                    T,
+                    heatProfile
+                );
+
+            halo_ms =
+                benchmarkHalo(
+                    cfg,
+                    N,
+                    T,
+                    heatProfile
+                );
+        }
+
+        //--------------------------------------------
+        // NSIGHT MODE
+        //--------------------------------------------
+
+        else if(cfg.execMode == NSIGHT_MODE)
+        {
+            gpu_ms =
+                benchmarkGPU(
+                    cfg,
+                    N,
+                    T,
+                    heatProfile
+                );
+
+            tiled_ms =
+                benchmarkTiled(
+                    cfg,
+                    N,
+                    T,
+                    heatProfile
+                );
+
+            halo_ms =
+                benchmarkHalo(
+                    cfg,
+                    N,
+                    T,
+                    heatProfile
+                );
+        }
+
+        //--------------------------------------------
+        // PROFILE MODE
+        //--------------------------------------------
+
+        else
+        {
+            if(cfg.kernelMode == GPU_KERNEL)
+            {
+                gpu_ms =
+                    benchmarkGPU(
+                        cfg,
+                        N,
+                        T,
+                        heatProfile
+                    );
+            }
+            else if(cfg.kernelMode == TILED_KERNEL)
+            {
+                tiled_ms =
+                    benchmarkTiled(
+                        cfg,
+                        N,
+                        T,
+                        heatProfile
+                    );
+            }
+            else
+            {
+                halo_ms =
+                    benchmarkHalo(
+                        cfg,
+                        N,
+                        T,
+                        heatProfile
+                    );
+            }
+        }
+
+        //--------------------------------------------
+        // Metrics only for NORMAL mode
+        //--------------------------------------------
+
+        if(cfg.execMode == NORMAL_MODE)
+        {
+            Metrics m =
+                computeMetrics(
+                    N,
+                    cfg.steps,
+                    cpu_ms,
+                    gpu_ms,
+                    tiled_ms,
+                    halo_ms
+                );
+
+            cout
+            << fixed
+            << setprecision(2)
+
+            << N << ","
+            << m.cpu_ms << ","
+            << m.gpu_ms << ","
+            << m.tiled_ms << ","
+            << m.halo_ms << ","
+
+            << m.gpu_speedup << ","
+            << m.tiled_speedup << ","
+            << m.halo_speedup << ","
+
+            << m.gpu_gflops << ","
+            << m.tiled_gflops << ","
+            << m.halo_gflops << ","
+
+            << m.gpu_bw << ","
+            << m.tiled_bw << ","
+            << m.halo_bw
+
+            << endl;
+
+            gridSizes.push_back(
+                N
             );
 
-        //--------------------------------------------
-        // GPU
-        //--------------------------------------------
-
-        double gpu_ms =
-            benchmarkGPU(
-                cfg,
-                N,
-                T,
-                heatProfile
+            results.push_back(
+                m
             );
-
-        //--------------------------------------------
-        // Shared GPU
-        //--------------------------------------------
-
-        double tiled_ms =
-            benchmarkTiled(
-                cfg,
-                N,
-                T,
-                heatProfile
-            );
-
-        //--------------------------------------------
-        // Halo GPU
-        //--------------------------------------------
-
-        double halo_ms =
-            benchmarkHalo(
-                cfg,
-                N,
-                T,
-                heatProfile
-            );
-
-        //--------------------------------------------
-        // Metrics
-        //--------------------------------------------
-
-        Metrics m =
-            computeMetrics(
-                N,
-                cfg.steps,
-                cpu_ms,
-                gpu_ms,
-                tiled_ms,
-                halo_ms
-            );
-
-        //--------------------------------------------
-        // Print Results
-        //--------------------------------------------
-
-        cout
-        << fixed
-        << setprecision(2)
-
-        << N << ","
-        << m.cpu_ms << ","
-        << m.gpu_ms << ","
-        << m.tiled_ms << ","
-        << m.halo_ms << ","
-
-        << m.gpu_speedup << ","
-        << m.tiled_speedup << ","
-        << m.halo_speedup << ","
-
-        << m.gpu_gflops << ","
-        << m.tiled_gflops << ","
-        << m.halo_gflops << ","
-
-        << m.gpu_bw << ","
-        << m.tiled_bw << ","
-        << m.halo_bw
-
-        << endl;
-
-        //--------------------------------------------
-        // Store
-        //--------------------------------------------
-
-        gridSizes.push_back(
-            N
-        );
-
-        results.push_back(
-            m
-        );
+        }
     }
 
     //------------------------------------------------
     // Save CSV
     //------------------------------------------------
 
-    saveResultsCSV(
-        gridSizes,
-        results
-    );
+    if(cfg.saveCSV)
+    {
+        saveResultsCSV(
+            gridSizes,
+            results
+        );
+    }
 
     //------------------------------------------------
     // Thermal Map
     //------------------------------------------------
 
-    generateThermalMap(
-        cfg,
-        heatProfile
-    );
+    if(cfg.savePlots)
+    {
+        generateThermalMap(
+            cfg,
+            heatProfile
+        );
+    }
 
     //------------------------------------------------
     // Cleanup

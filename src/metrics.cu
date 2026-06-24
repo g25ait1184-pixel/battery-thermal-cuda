@@ -1,40 +1,64 @@
 #include "metrics.h"
 
+using namespace std;
+
+//----------------------------------------------------
+// GFLOPS
+//----------------------------------------------------
+
 double calculateGFLOPS(
     int N,
     int steps,
     double time_ms)
 {
+    if(time_ms <= 0.0)
+    {
+        return 0.0;
+    }
+
+    // 5 additions + 1 multiplication + 1 addition
     double flops =
         7.0 *
-        (N-2) *
-        (N-2) *
+        (N - 2) *
+        (N - 2) *
         steps;
 
     return
         flops /
-        (time_ms/1000.0) /
+        (time_ms / 1000.0) /
         1e9;
 }
 
+//----------------------------------------------------
+// Effective Bandwidth
+//----------------------------------------------------
 
 double calculateBandwidth(
     int N,
     int steps,
     double time_ms)
 {
+    if(time_ms <= 0.0)
+    {
+        return 0.0;
+    }
+
+    // 5 reads + 1 write = 6 floats = 24 bytes
     double bytes =
         24.0 *
-        (N-2) *
-        (N-2) *
+        (N - 2) *
+        (N - 2) *
         steps;
 
     return
         bytes /
-        (time_ms/1000.0) /
+        (time_ms / 1000.0) /
         1e9;
 }
 
+//----------------------------------------------------
+// Metrics
+//----------------------------------------------------
 
 Metrics computeMetrics(
     int N,
@@ -46,27 +70,52 @@ Metrics computeMetrics(
 {
     Metrics m;
 
-    m.cpu_ms = cpu_ms;
-    m.gpu_ms = gpu_ms;
-    m.tiled_ms = tiled_ms;
-    m.halo_ms = halo_ms;
+    //------------------------------------------------
+    // Runtime
+    //------------------------------------------------
 
-    //------------------------
+    m.cpu_ms =
+        cpu_ms;
+
+    m.gpu_ms =
+        gpu_ms;
+
+    m.tiled_ms =
+        tiled_ms;
+
+    m.halo_ms =
+        halo_ms;
+
+
+    //------------------------------------------------
     // Speedup
-    //------------------------
+    //------------------------------------------------
 
     m.gpu_speedup =
-        cpu_ms / gpu_ms;
+        (gpu_ms > 0.0)
+        ?
+        cpu_ms / gpu_ms
+        :
+        0.0;
 
     m.tiled_speedup =
-        cpu_ms / tiled_ms;
+        (tiled_ms > 0.0)
+        ?
+        cpu_ms / tiled_ms
+        :
+        0.0;
 
     m.halo_speedup =
-        cpu_ms / halo_ms;
+        (halo_ms > 0.0)
+        ?
+        cpu_ms / halo_ms
+        :
+        0.0;
 
-    //------------------------
+
+    //------------------------------------------------
     // GFLOPS
-    //------------------------
+    //------------------------------------------------
 
     m.gpu_gflops =
         calculateGFLOPS(
@@ -89,9 +138,10 @@ Metrics computeMetrics(
             halo_ms
         );
 
-    //------------------------
-    // Bandwidth
-    //------------------------
+
+    //------------------------------------------------
+    // Effective Memory Bandwidth
+    //------------------------------------------------
 
     m.gpu_bw =
         calculateBandwidth(

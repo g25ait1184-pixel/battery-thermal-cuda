@@ -2,37 +2,61 @@
 
 #include <vector>
 #include <string>
+
 using namespace std;
 
-#define BASE_DIR "/content/project/"
+//=====================================================
+// Paths
+//=====================================================
 
-#define DATA_DIR    BASE_DIR "data/"
-#define RESULT_DIR  BASE_DIR "results/"
-#define PLOT_DIR    BASE_DIR "plots/"
-//----------------------------------
-// Heat Modes
-//----------------------------------
+#define BASE_DIR   "/content/project/project/"
+
+#define DATA_DIR   BASE_DIR "data/"
+#define RESULT_DIR BASE_DIR "results/"
+#define PLOT_DIR   BASE_DIR "plots/"
+
+
+//=====================================================
+// Compile-Time Heat Modes
+//=====================================================
 
 #define CONSTANT_Q_MODE 0
 #define DYNAMIC_Q_MODE  1
-
-//----------------------------------
-// Execution Modes
-//----------------------------------
-
-#define NORMAL_EXECUTION 0
-#define NSIGHT_EXECUTION 1
 
 #ifndef HEAT_MODE
 #define HEAT_MODE DYNAMIC_Q_MODE
 #endif
 
+
+//=====================================================
+// Compile-Time Execution Modes
+//=====================================================
+
+#define NORMAL_EXECUTION         0
+#define NSIGHT_EXECUTION         1
+#define PROFILE_SINGLE_KERNEL    2
+
 #ifndef EXEC_MODE
 #define EXEC_MODE NORMAL_EXECUTION
 #endif
-//-------------------------------------
-// Heat Source Mode
-//-------------------------------------
+
+
+//=====================================================
+// Kernel Selection for Profile Mode
+//=====================================================
+
+#define PROFILE_GPU_KERNEL       0
+#define PROFILE_TILED_KERNEL     1
+#define PROFILE_HALO_KERNEL      2
+
+#ifndef PROFILE_KERNEL
+#define PROFILE_KERNEL PROFILE_HALO_KERNEL
+#endif
+
+
+//=====================================================
+// Runtime Heat Mode
+//=====================================================
 
 enum HeatMode
 {
@@ -40,23 +64,40 @@ enum HeatMode
     DYNAMIC_Q
 };
 
-//-------------------------------------
-// Execution Mode
-//-------------------------------------
+
+//=====================================================
+// Runtime Execution Mode
+//=====================================================
 
 enum ExecMode
 {
     NORMAL_MODE,
-    NSIGHT_MODE
+    NSIGHT_MODE,
+    PROFILE_MODE
 };
 
-//-------------------------------------
-// Configuration
-//-------------------------------------
+
+//=====================================================
+// Runtime Kernel Selection
+//=====================================================
+
+enum KernelMode
+{
+    GPU_KERNEL,
+    TILED_KERNEL,
+    HALO_KERNEL
+};
+
+
+//=====================================================
+// Configuration Structure
+//=====================================================
 
 struct Config
 {
+    //------------------------------------------
     // Physics
+    //------------------------------------------
 
     float alpha = 0.1f;
 
@@ -66,13 +107,21 @@ struct Config
 
     float current = 20.0f;
 
+
+    //------------------------------------------
     // Modes
+    //------------------------------------------
 
     HeatMode heatMode;
 
     ExecMode execMode;
 
+    KernelMode kernelMode;
+
+
+    //------------------------------------------
     // Benchmark
+    //------------------------------------------
 
     int RUNS;
 
@@ -80,13 +129,28 @@ struct Config
 
     vector<int> sizes;
 
+
+    //------------------------------------------
+    // Output
+    //------------------------------------------
+
+    bool saveCSV;
+
+    bool savePlots;
+
+
+    //------------------------------------------
     // Thermal Map
+    //------------------------------------------
 
     int thermalMapSize = 256;
 
     int thermalMapSteps = 2000;
 };
 
-// function
+
+//=====================================================
+// Function
+//=====================================================
 
 Config initConfig();
