@@ -353,29 +353,6 @@ AI ≈ 0.29 FLOP/Byte
 
 The stencil kernel is primarily memory-bandwidth limited, making shared-memory and halo optimizations highly effective.
 
----
-
-# Future Work
-
-Temperature-dependent resistance:
-
-```math
-R(T)=R_0(1+\alpha(T-T_0))
-```
-
-Planned extensions:
-
-* Electro-thermal coupling
-* SOC estimation
-* SOH estimation
-* Multi-GPU halo exchange
-* CUDA streams
-* NVLink optimization
-* Battery Digital Twin
-* AI surrogate models
-* Tensor Core acceleration
-
----
 # Performance Results
 
 The framework reports runtime, speedup, computational throughput (GFLOPS), and effective memory bandwidth for CPU, Global GPU, Shared GPU, and Halo GPU implementations.
@@ -459,6 +436,30 @@ The experimental results demonstrate that:
 * Halo optimization delivers the highest GFLOPS and memory bandwidth.
 * Performance scales with increasing grid sizes, making the framework suitable for large-scale battery thermal simulations.
 * The developed framework provides a foundation for future multi-GPU battery digital twins and electro-thermal simulations.
+
+---
+
+# Future Work
+
+Temperature-dependent resistance:
+
+```math
+R(T)=R_0(1+\alpha(T-T_0))
+```
+
+Planned extensions:
+
+* Electro-thermal coupling
+* SOC estimation
+* SOH estimation
+* Multi-GPU halo exchange
+* CUDA streams
+* NVLink optimization
+* Battery Digital Twin
+* AI surrogate models
+* Tensor Core acceleration
+
+---
 
 # License
 
