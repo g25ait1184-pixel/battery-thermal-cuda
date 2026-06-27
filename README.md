@@ -276,8 +276,14 @@ battery-thermal-cuda
 
 Compile:
 
-```bash
+```%%bash
+
+cd /content/project/project
+
 nvcc \
+-Wno-deprecated-gpu-targets \
+-DHEAT_MODE=DYNAMIC_Q_MODE \
+-DEXEC_MODE=NORMAL_EXECUTION \
 -Iinclude \
 src/*.cu \
 kernels/*.cu \
@@ -298,8 +304,14 @@ kernels/*.cu \
 
 Compile:
 
-```bash
-nvcc -lineinfo \
+```%%bash
+
+cd /content/project/project
+
+nvcc \
+-Wno-deprecated-gpu-targets \
+-DHEAT_MODE=DYNAMIC_Q_MODE \
+-DEXEC_MODE=NSIGHT_EXECUTION \
 -Iinclude \
 src/*.cu \
 kernels/*.cu \
@@ -308,8 +320,10 @@ kernels/*.cu \
 
 Profile:
 
-```bash
-ncu --set full ./thermal
+```ncu \
+--set full \
+--launch-count 1 \
+./thermal
 ```
 
 Metrics analyzed:
