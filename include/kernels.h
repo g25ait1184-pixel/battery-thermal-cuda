@@ -7,8 +7,13 @@
 // GPU KERNEL DECLARATIONS
 //======================================================
 
+
 //------------------------------------------------------
 // Global Memory GPU Stencil
+//------------------------------------------------------
+//
+// V1-V5 thermal kernel.
+// V5 additionally uses SOC/SOH parameters.
 //------------------------------------------------------
 
 __global__
@@ -16,9 +21,33 @@ void gpuStencil(
     float* T,
     float* Tnew,
     int N,
+
     float alpha,
     float beta,
-    float Q
+
+    float nasaHeat,
+
+    int modelVersion,
+
+    float current,
+    float baseResistance,
+
+    float referenceTemperature,
+
+    float resistanceCoeff,
+    float diffusivityCoeff,
+
+    float entropyCoeff,
+
+    // V5 SOC/SOH
+    float soc,
+    float soh,
+
+    float socResistanceCoeff,
+    float sohResistanceCoeff,
+
+    float socHeatCoeff,
+    float sohHeatCoeff
 );
 
 
@@ -31,9 +60,33 @@ void tiledStencil(
     float* T,
     float* Tnew,
     int N,
+
     float alpha,
     float beta,
-    float Q
+
+    float nasaHeat,
+
+    int modelVersion,
+
+    float current,
+    float baseResistance,
+
+    float referenceTemperature,
+
+    float resistanceCoeff,
+    float diffusivityCoeff,
+
+    float entropyCoeff,
+
+    // V5 SOC/SOH
+    float soc,
+    float soh,
+
+    float socResistanceCoeff,
+    float sohResistanceCoeff,
+
+    float socHeatCoeff,
+    float sohHeatCoeff
 );
 
 
@@ -46,15 +99,40 @@ void haloStencil(
     float* T,
     float* Tnew,
     int N,
+
     float alpha,
     float beta,
-    float Q
+
+    float nasaHeat,
+
+    int modelVersion,
+
+    float current,
+    float baseResistance,
+
+    float referenceTemperature,
+
+    float resistanceCoeff,
+    float diffusivityCoeff,
+
+    float entropyCoeff,
+
+    // V5 SOC/SOH
+    float soc,
+    float soh,
+
+    float socResistanceCoeff,
+    float sohResistanceCoeff,
+
+    float socHeatCoeff,
+    float sohHeatCoeff
 );
 
 
 //======================================================
 // GPU SOLVER INTERFACES
 //======================================================
+
 
 //------------------------------------------------------
 // Global GPU Solver
@@ -64,10 +142,13 @@ void runGPU(
     float* d_T,
     float* d_Tnew,
     int N,
+
     float alpha,
     int steps,
     float beta,
+
     const BatteryParameters& params,
+
     const std::vector<float>& heatProfile
 );
 
@@ -80,10 +161,13 @@ void runTiledGPU(
     float* d_T,
     float* d_Tnew,
     int N,
+
     float alpha,
     int steps,
     float beta,
+
     const BatteryParameters& params,
+
     const std::vector<float>& heatProfile
 );
 
@@ -96,9 +180,12 @@ void runHaloGPU(
     float* d_T,
     float* d_Tnew,
     int N,
+
     float alpha,
     int steps,
     float beta,
+
     const BatteryParameters& params,
+
     const std::vector<float>& heatProfile
 );
