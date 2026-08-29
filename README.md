@@ -1,6 +1,38 @@
 # battery-thermal-cuda
 
-GPU-Accelerated Battery Thermal Propagation Simulator using CUDA with Global Memory, Shared Memory, and Halo Optimization.
+GPU-Accelerated Battery Electro-Thermal Simulation and Thermal Propagation Framework using CUDA, with Global Memory, Shared Memory, and Halo optimization.
+
+## Current Release
+
+**v1.0.0 — Complete V1→V5 Validated Thermal Solver**
+
+This release consolidates the completed V1→V5 battery electro-thermal model progression and the corresponding CPU/GPU, tiled, and halo validation results. The V1→V5 execution completed successfully for 256×256, 512×512, 1024×1024, and 2048×2048 grids.
+
+### V1→V5 Model Evolution
+
+| Model | Thermal formulation |
+|---|---|
+| **V1** | NASA heat only |
+| **V2** | NASA heat + Joule heating |
+| **V3** | NASA heat + temperature-dependent resistance |
+| **V4** | NASA heat + temperature-dependent resistance + entropy heat |
+| **V5** | SOC/SOH-aware electro-thermal model |
+
+The execution uses **1,698 NASA heat samples** with dynamic heat input. The supplied results show CPU-vs-GPU validation errors remaining in the micro-/sub-micro-degree range across the tested grids.
+
+## Release Roadmap
+
+```text
+v0.1.0  → NASA Heat V1 baseline
+v1.0.0  → Complete V1→V5 validated thermal solver
+v1.1.0  → CUDA Streams integration
+v1.2.0  → Performance validation
+v1.3.0  → V5 simulation dataset generation
+v2.0.0  → AI thermal predictor
+v2.1.0  → Physics + AI residual correction
+v3.0.0  → Battery Thermal Digital Twin
+v3.1.0  → Final integrated benchmark
+```
 
 ---
 
@@ -453,7 +485,7 @@ The experimental results demonstrate that:
 
 ---
 
-# Future Work
+# Future Work and Next Development Stages
 
 Temperature-dependent resistance:
 
@@ -461,7 +493,7 @@ Temperature-dependent resistance:
 R(T)=R_0(1+\alpha(T-T_0))
 ```
 
-Planned extensions:
+Planned extensions and roadmap:
 
 * Electro-thermal coupling
 * SOC estimation
@@ -472,6 +504,30 @@ Planned extensions:
 * Battery Digital Twin
 * AI surrogate models
 * Tensor Core acceleration
+
+---
+
+# V1→V5 Validation Snapshot
+
+The supplied execution results report the following representative CPU-vs-GPU validation values for **MODEL_V5**:
+
+| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
+|---|---:|---:|---:|---:|
+| 256×256 | 1.60e-06 | 1.53e-05 | 1.26e-06 | 5.02e-08 |
+| 512×512 | 1.75e-06 | 2.29e-05 | 1.54e-06 | 5.47e-08 |
+| 1024×1024 | 1.81e-06 | 1.53e-05 | 1.67e-06 | 5.63e-08 |
+| 2048×2048 | 1.84e-06 | 1.53e-05 | 1.74e-06 | 5.72e-08 |
+
+The V5 benchmark output also reports, at 2048×2048:
+
+- GPU speedup: **1001.81×**
+- Tiled speedup: **1045.27×**
+- Halo speedup: **1096.88×**
+- GPU: **128.87 GFLOPS**, **441.86 GB/s**
+- Tiled: **134.47 GFLOPS**, **461.02 GB/s**
+- Halo: **141.10 GFLOPS**, **483.79 GB/s**
+
+These values are the V5 run results supplied for this release.
 
 ---
 
