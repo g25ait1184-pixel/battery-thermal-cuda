@@ -3,13 +3,16 @@
 #include <vector>
 #include <string>
 
+#include "battery_model.h"
+
 using namespace std;
+
 
 //=====================================================
 // Paths
 //=====================================================
 
-#define BASE_DIR   "/content/project/project/"
+#define BASE_DIR   "/content/drive/MyDrive/CUDA_Project/project/"
 
 #define DATA_DIR   BASE_DIR "data/"
 #define RESULT_DIR BASE_DIR "results/"
@@ -95,9 +98,9 @@ enum KernelMode
 
 struct Config
 {
-    //------------------------------------------
-    // Physics
-    //------------------------------------------
+    //=================================================
+    // Basic Thermal Physics
+    //=================================================
 
     float alpha = 0.1f;
 
@@ -108,9 +111,9 @@ struct Config
     float current = 20.0f;
 
 
-    //------------------------------------------
-    // Modes
-    //------------------------------------------
+    //=================================================
+    // Execution Modes
+    //=================================================
 
     HeatMode heatMode;
 
@@ -119,38 +122,194 @@ struct Config
     KernelMode kernelMode;
 
 
-    //------------------------------------------
-    // Benchmark
-    //------------------------------------------
+    //=================================================
+    // Benchmark Configuration
+    //=================================================
 
-    int RUNS;
+    int RUNS = 20;
 
-    int steps;
+    int steps = 100;
 
     vector<int> sizes;
 
 
-    //------------------------------------------
+    //=================================================
     // Output
-    //------------------------------------------
+    //=================================================
 
-    bool saveCSV;
+    bool saveCSV = true;
 
-    bool savePlots;
+    bool savePlots = true;
 
 
-    //------------------------------------------
+    //=================================================
     // Thermal Map
-    //------------------------------------------
+    //=================================================
 
     int thermalMapSize = 256;
 
     int thermalMapSteps = 2000;
+
+
+    //=================================================
+    // Battery Model Version
+    //=================================================
+
+    BatteryModelVersion modelVersion;
+
+
+    //=================================================
+    // Battery Physics Parameters
+    //=================================================
+
+    //-----------------------------------------------
+    // Reference Temperature
+    //-----------------------------------------------
+
+    float referenceTemperature = 25.0f;
+
+
+    //-----------------------------------------------
+    // Temperature-dependent Resistance
+    //-----------------------------------------------
+
+    float resistanceCoeff = 0.004f;
+
+
+    //-----------------------------------------------
+    // Temperature-dependent Diffusivity
+    //-----------------------------------------------
+
+    float diffusivityCoeff = 0.002f;
+
+
+    //-----------------------------------------------
+    // Entropy / Reversible Heat
+    //-----------------------------------------------
+
+    float entropyCoeff = 0.0001f;
+
+
+    //=================================================
+    // Electro-Thermal Enable Flags
+    //=================================================
+
+    bool enableTempResistance = true;
+
+    bool enableTempDiffusivity = true;
+
+    bool enableElectroThermal = true;
+
+
+    //=================================================
+    // V5 — SOC / SOH PARAMETERS
+    //=================================================
+
+    //-----------------------------------------------
+    // Initial SOC
+    //-----------------------------------------------
+    //
+    // 1.0 = 100%
+    // 0.0 = 0%
+    //
+
+    float initialSOC = 1.0f;
+
+
+    //-----------------------------------------------
+    // Initial SOH
+    //-----------------------------------------------
+    //
+    // 1.0 = 100%
+    // 0.0 = fully degraded
+    //
+
+    float initialSOH = 1.0f;
+
+
+    //=================================================
+    // Runtime SOC / SOH
+    //=================================================
+    //
+    // These are explicitly provided because the
+    // V5 solver/benchmark uses cfg.soc and cfg.soh.
+    //
+    // They can later be updated dynamically during
+    // the simulation.
+    //
+
+    float soc = 1.0f;
+
+    float soh = 1.0f;
+
+
+    //=================================================
+    // SOC-Dependent Resistance
+    //=================================================
+    //
+    // Resistance multiplier contribution:
+    //
+    // R_SOC = 1 + coeff * (1 - SOC)
+    //
+    // Higher resistance at lower SOC.
+    //
+
+    float socResistanceCoeff = 0.20f;
+
+
+    //=================================================
+    // SOH-Dependent Resistance
+    //=================================================
+    //
+    // Resistance multiplier contribution:
+    //
+    // R_SOH = 1 + coeff * (1 - SOH)
+    //
+    // Resistance increases as battery ages.
+    //
+
+    float sohResistanceCoeff = 0.50f;
+
+
+    //=================================================
+    // SOC-Dependent Heat
+    //=================================================
+    //
+    // Controls additional heat generated as a
+    // function of SOC.
+    //
+
+    float socHeatCoeff = 0.10f;
+
+
+    //=================================================
+    // SOH-Dependent Heat
+    //=================================================
+    //
+    // Controls additional heat generated as a
+    // function of degradation.
+    //
+
+    float sohHeatCoeff = 0.20f;
+
+
+    //=================================================
+    // SOC Coupling Enable
+    //=================================================
+
+    bool enableSOCCoupling = true;
+
+
+    //=================================================
+    // SOH Coupling Enable
+    //=================================================
+
+    bool enableSOHCoupling = true;
 };
 
 
 //=====================================================
-// Function
+// Configuration Initialization
 //=====================================================
 
 Config initConfig();

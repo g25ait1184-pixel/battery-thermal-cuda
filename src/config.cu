@@ -1,8 +1,10 @@
 #include "config.h"
 
+
 Config initConfig()
 {
     Config cfg;
+
 
     //--------------------------------------
     // Heat Source Selection
@@ -53,7 +55,7 @@ Config initConfig()
 
 
     //--------------------------------------
-    // Physics
+    // Basic Physics
     //--------------------------------------
 
     cfg.alpha = 0.1f;
@@ -132,12 +134,130 @@ Config initConfig()
 
 
     //--------------------------------------
-    // Thermal Map
+    // Thermal Model
     //--------------------------------------
 
     cfg.thermalMapSize = 256;
 
     cfg.thermalMapSteps = 2000;
+
+
+    //--------------------------------------
+    // Reference Temperature
+    //--------------------------------------
+
+    cfg.referenceTemperature = 25.0f;
+
+
+    //--------------------------------------
+    // Temperature Dependent Resistance
+    //--------------------------------------
+
+    cfg.resistanceCoeff = 0.004f;
+
+    cfg.enableTempResistance = true;
+
+
+    //--------------------------------------
+    // Temperature Dependent Diffusivity
+    //--------------------------------------
+
+    cfg.diffusivityCoeff = 0.002f;
+
+    cfg.enableTempDiffusivity = true;
+
+
+    //--------------------------------------
+    // Entropy / Reversible Heat
+    //--------------------------------------
+
+    cfg.entropyCoeff = 0.0001f;
+
+
+    //--------------------------------------
+    // Electro-Thermal Coupling
+    //--------------------------------------
+
+    cfg.enableElectroThermal = true;
+
+
+    //--------------------------------------
+    // SOC / SOH INITIAL CONDITIONS
+    //--------------------------------------
+
+    cfg.initialSOC = 1.0f;
+
+    cfg.initialSOH = 1.0f;
+
+
+    //--------------------------------------
+    // SOC-Dependent Resistance
+    //--------------------------------------
+    //
+    // Resistance modification:
+    //
+    // R = R(T) *
+    //     [1 + socResistanceCoeff * (1-SOC)]
+    //
+    //--------------------------------------
+
+    cfg.socResistanceCoeff = 0.20f;
+
+
+    //--------------------------------------
+    // SOH-Dependent Resistance
+    //--------------------------------------
+    //
+    // Resistance modification:
+    //
+    // R = R(T) *
+    //     [1 + sohResistanceCoeff * (1-SOH)]
+    //
+    //--------------------------------------
+
+    cfg.sohResistanceCoeff = 0.50f;
+
+
+    //--------------------------------------
+    // SOC-Dependent Heat
+    //--------------------------------------
+
+    cfg.socHeatCoeff = 0.10f;
+
+
+    //--------------------------------------
+    // SOH-Dependent Heat
+    //--------------------------------------
+
+    cfg.sohHeatCoeff = 0.20f;
+
+
+    //--------------------------------------
+    // SOC / SOH Coupling Enable
+    //--------------------------------------
+
+    cfg.enableSOCCoupling = true;
+
+    cfg.enableSOHCoupling = true;
+
+
+    //--------------------------------------
+    // MODEL VERSION
+    //--------------------------------------
+    //
+    // V5:
+    //
+    // NASA Heat
+    // + Joule Heating
+    // + Temperature Dependent Resistance
+    // + Entropy Heat
+    // + SOC Dependent Effects
+    // + SOH Dependent Effects
+    //
+    //--------------------------------------
+
+    cfg.modelVersion = MODEL_V5;
+
 
     return cfg;
 }
