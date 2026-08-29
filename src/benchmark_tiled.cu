@@ -1,24 +1,163 @@
+#include <vector>
+#include <cuda_runtime.h>
+
 #include "config.h"
 #include "cuda_events.h"
 #include "kernels.h"
+#include "battery_model.h"
+
+using namespace std;
+
+
+//======================================================
+// Tiled / Shared-Memory GPU Benchmark
+//======================================================
 
 double benchmarkTiled(
     Config& cfg,
     int N,
     vector<float>& T,
-    vector<float>& heatProfile)
+    vector<float>& heatProfile,
+    vector<float>& finalT)
 {
+    //--------------------------------------------------
+    // Memory size
+    //--------------------------------------------------
+
     size_t bytes =
-        N * N * sizeof(float);
+        static_cast<size_t>(N) *
+        static_cast<size_t>(N) *
+        sizeof(float);
 
-    float tiled_total = 0.0f;
 
-    for(int r=0;
-        r<cfg.RUNS;
+    //--------------------------------------------------
+    // Total execution time
+    //--------------------------------------------------
+
+    double tiled_total = 0.0;
+
+
+    //--------------------------------------------------
+    // Prepare output thermal field
+    //--------------------------------------------------
+
+    finalT.clear();
+
+
+    //--------------------------------------------------
+    // Battery Parameters
+    //--------------------------------------------------
+
+    BatteryParameters params{};
+
+
+    //--------------------------------------------------
+    // Model version
+    //--------------------------------------------------
+
+    params.modelVersion =
+        static_cast<int>(cfg.modelVersion);
+
+
+    //--------------------------------------------------
+    // Electrical parameters
+    //--------------------------------------------------
+
+    params.current =
+        cfg.current;
+
+    params.baseResistance =
+        cfg.resistance;
+
+
+    //--------------------------------------------------
+    // Reference temperature
+    //--------------------------------------------------
+
+    params.referenceTemperature =
+        cfg.referenceTemperature;
+
+
+    //--------------------------------------------------
+    // Temperature-dependent parameters
+    //--------------------------------------------------
+
+    params.resistanceCoeff =
+        cfg.resistanceCoeff;
+
+    params.diffusivityCoeff =
+        cfg.diffusivityCoeff;
+
+
+    //--------------------------------------------------
+    // Entropy / reversible heat
+    //--------------------------------------------------
+
+    params.entropyCoeff =
+        cfg.entropyCoeff;
+
+
+    //--------------------------------------------------
+    // V5 - SOC / SOH state
+    //--------------------------------------------------
+
+    params.soc =
+        cfg.initialSOC;
+
+    params.soh =
+        cfg.initialSOH;
+
+
+    //--------------------------------------------------
+    // V5 - SOC/SOH resistance coefficients
+    //--------------------------------------------------
+
+    params.socResistanceCoeff =
+        cfg.socResistanceCoeff;
+
+    params.sohResistanceCoeff =
+        cfg.sohResistanceCoeff;
+
+
+    //--------------------------------------------------
+    // V5 - SOC/SOH heat coefficients
+    //--------------------------------------------------
+
+    params.socHeatCoeff =
+        cfg.socHeatCoeff;
+
+    params.sohHeatCoeff =
+        cfg.sohHeatCoeff;
+
+
+    //--------------------------------------------------
+    // Validate benchmark configuration
+    //--------------------------------------------------
+
+    if(cfg.RUNS <= 0)
+    {
+        return 0.0;
+    }
+
+
+    //--------------------------------------------------
+    // Benchmark runs
+    //--------------------------------------------------
+
+    for(int r = 0;
+        r < cfg.RUNS;
         r++)
     {
-        float *d_T;
-        float *d_Tnew;
+        float* d_T =
+            nullptr;
+
+        float* d_Tnew =
+            nullptr;
+
+
+        //--------------------------------------------------
+        // Allocate GPU memory
+        //--------------------------------------------------
 
         cudaMalloc(
             &d_T,
@@ -30,6 +169,11 @@ double benchmarkTiled(
             bytes
         );
 
+
+        //--------------------------------------------------
+        // Copy initial temperature field
+        //--------------------------------------------------
+
         cudaMemcpy(
             d_T,
             T.data(),
@@ -37,9 +181,31 @@ double benchmarkTiled(
             cudaMemcpyHostToDevice
         );
 
+
+        //--------------------------------------------------
+        // Initialize second ping-pong buffer
+        //--------------------------------------------------
+
+        cudaMemcpy(
+            d_Tnew,
+            T.data(),
+            bytes,
+            cudaMemcpyHostToDevice
+        );
+
+
+        //--------------------------------------------------
+        // Start CUDA timer
+        //--------------------------------------------------
+
         cudaEventRecord(
             startEvent
         );
+
+
+        //--------------------------------------------------
+        // Run Tiled GPU solver
+        //--------------------------------------------------
 
         runTiledGPU(
             d_T,
@@ -48,8 +214,14 @@ double benchmarkTiled(
             cfg.alpha,
             cfg.steps,
             cfg.beta,
+            params,
             heatProfile
         );
+
+
+        //--------------------------------------------------
+        // Stop CUDA timer
+        //--------------------------------------------------
 
         cudaEventRecord(
             stopEvent
@@ -59,7 +231,12 @@ double benchmarkTiled(
             stopEvent
         );
 
-        float ms;
+
+        //--------------------------------------------------
+        // Measure elapsed time
+        //--------------------------------------------------
+
+        float ms = 0.0f;
 
         cudaEventElapsedTime(
             &ms,
@@ -67,7 +244,63 @@ double benchmarkTiled(
             stopEvent
         );
 
-        tiled_total += ms;
+        tiled_total +=
+            static_cast<double>(ms);
+
+
+        //--------------------------------------------------
+        // Capture final temperature field
+        //--------------------------------------------------
+
+        if(r == cfg.RUNS - 1)
+        {
+            finalT.resize(
+                static_cast<size_t>(N) *
+                static_cast<size_t>(N)
+            );
+
+
+            //------------------------------------------------
+            // runTiledGPU() swaps its local pointers.
+            //
+            // Caller pointers remain unchanged.
+            //
+            // Even steps -> d_T
+            // Odd  steps -> d_Tnew
+            //------------------------------------------------
+
+            float* finalDeviceBuffer =
+                nullptr;
+
+
+            if(cfg.steps % 2 == 0)
+            {
+                finalDeviceBuffer =
+                    d_T;
+            }
+            else
+            {
+                finalDeviceBuffer =
+                    d_Tnew;
+            }
+
+
+            //------------------------------------------------
+            // Copy final thermal field to host
+            //------------------------------------------------
+
+            cudaMemcpy(
+                finalT.data(),
+                finalDeviceBuffer,
+                bytes,
+                cudaMemcpyDeviceToHost
+            );
+        }
+
+
+        //--------------------------------------------------
+        // Free GPU memory
+        //--------------------------------------------------
 
         cudaFree(
             d_T
@@ -78,7 +311,12 @@ double benchmarkTiled(
         );
     }
 
+
+    //--------------------------------------------------
+    // Return average execution time
+    //--------------------------------------------------
+
     return
         tiled_total /
-        cfg.RUNS;
+        static_cast<double>(cfg.RUNS);
 }

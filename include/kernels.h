@@ -1,39 +1,50 @@
 #pragma once
 
 #include <vector>
+#include "battery_model.h"
 
-using namespace std;
+//======================================================
+// GPU KERNEL DECLARATIONS
+//======================================================
 
-// Global GPU
+//------------------------------------------------------
+// Global Memory GPU Stencil
+//------------------------------------------------------
 
 __global__
 void gpuStencil(
-    float *T,
-    float *Tnew,
+    float* T,
+    float* Tnew,
     int N,
     float alpha,
     float beta,
     float Q
 );
 
-// Shared GPU
+
+//------------------------------------------------------
+// Shared Memory / Tiled GPU Stencil
+//------------------------------------------------------
 
 __global__
 void tiledStencil(
-    float *T,
-    float *Tnew,
+    float* T,
+    float* Tnew,
     int N,
     float alpha,
     float beta,
     float Q
 );
 
-// Halo GPU
+
+//------------------------------------------------------
+// Halo GPU Stencil
+//------------------------------------------------------
 
 __global__
 void haloStencil(
-    float *T,
-    float *Tnew,
+    float* T,
+    float* Tnew,
     int N,
     float alpha,
     float beta,
@@ -41,77 +52,53 @@ void haloStencil(
 );
 
 
+//======================================================
+// GPU SOLVER INTERFACES
+//======================================================
 
-//------------------------------------------------
-// Global GPU
-//------------------------------------------------
-
-__global__
-void gpuStencil(
-    float *T,
-    float *Tnew,
-    int N,
-    float alpha,
-    float beta,
-    float Q
-);
+//------------------------------------------------------
+// Global GPU Solver
+//------------------------------------------------------
 
 void runGPU(
-    float *d_T,
-    float *d_Tnew,
+    float* d_T,
+    float* d_Tnew,
     int N,
     float alpha,
     int steps,
     float beta,
-    const vector<float>& heatProfile
+    const BatteryParameters& params,
+    const std::vector<float>& heatProfile
 );
 
 
-//------------------------------------------------
-// Shared GPU
-//------------------------------------------------
-
-__global__
-void tiledStencil(
-    float *T,
-    float *Tnew,
-    int N,
-    float alpha,
-    float beta,
-    float Q
-);
+//------------------------------------------------------
+// Tiled / Shared Memory GPU Solver
+//------------------------------------------------------
 
 void runTiledGPU(
-    float *d_T,
-    float *d_Tnew,
+    float* d_T,
+    float* d_Tnew,
     int N,
     float alpha,
     int steps,
     float beta,
-    const vector<float>& heatProfile
+    const BatteryParameters& params,
+    const std::vector<float>& heatProfile
 );
 
 
-//------------------------------------------------
-// Halo GPU
-//------------------------------------------------
-
-__global__
-void haloStencil(
-    float *T,
-    float *Tnew,
-    int N,
-    float alpha,
-    float beta,
-    float Q
-);
+//------------------------------------------------------
+// Halo GPU Solver
+//------------------------------------------------------
 
 void runHaloGPU(
-    float *d_T,
-    float *d_Tnew,
+    float* d_T,
+    float* d_Tnew,
     int N,
     float alpha,
     int steps,
     float beta,
-    const vector<float>& heatProfile
+    const BatteryParameters& params,
+    const std::vector<float>& heatProfile
 );

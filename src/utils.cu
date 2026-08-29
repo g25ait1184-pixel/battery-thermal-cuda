@@ -212,68 +212,117 @@ void printSimulationInfo(
 // Save Results CSV
 //--------------------------------------------------
 
+//--------------------------------------------------
+// Save Results CSV
+//--------------------------------------------------
+
 void saveResultsCSV(
     vector<int>& gridSizes,
-    vector<Metrics>& results)
+    vector<Metrics>& results,
+    const string& modelName)
 {
+    //------------------------------------------------
+    // Output Filename
+    //------------------------------------------------
+
+    string filename =
+        string(RESULT_DIR) +
+        "results_" +
+        modelName +
+        ".csv";
+
     ofstream fout(
-    RESULT_DIR "results.csv"
-);
+        filename
+    );
+
+    //------------------------------------------------
+    // CSV Header
+    //------------------------------------------------
 
     fout
-    << "Grid,CPU,GPU,Tiled,Halo,"
-    << "GPU_Speedup,Tiled_Speedup,Halo_Speedup,"
-    << "GPU_GFLOPS,Tiled_GFLOPS,Halo_GFLOPS,"
-    << "GPU_BW,Tiled_BW,Halo_BW\n";
 
-    for(int i=0;i<gridSizes.size();i++)
+    << "Grid,"
+
+    << "CPU(ms),"
+    << "GPU(ms),"
+    << "Tiled(ms),"
+    << "Halo(ms),"
+
+    << "GPU_Speedup,"
+    << "Tiled_Speedup,"
+    << "Halo_Speedup,"
+
+    << "GPU_GFLOPS,"
+    << "Tiled_GFLOPS,"
+    << "Halo_GFLOPS,"
+
+    << "GPU_BW(GB/s),"
+    << "Tiled_BW(GB/s),"
+    << "Halo_BW(GB/s),"
+
+    << "ArithmeticIntensity,"
+
+    << "UpdatesPerSecond,"
+
+    << "Latency_ms"
+
+    << "\n";
+
+    //------------------------------------------------
+    // Write Results
+    //------------------------------------------------
+
+    for(size_t i = 0;
+        i < gridSizes.size();
+        i++)
     {
-        Metrics m =
+        const Metrics& m =
             results[i];
 
         fout
+
         << gridSizes[i] << ","
+
         << m.cpu_ms << ","
+
         << m.gpu_ms << ","
+
         << m.tiled_ms << ","
+
         << m.halo_ms << ","
+
         << m.gpu_speedup << ","
+
         << m.tiled_speedup << ","
+
         << m.halo_speedup << ","
+
         << m.gpu_gflops << ","
+
         << m.tiled_gflops << ","
+
         << m.halo_gflops << ","
+
         << m.gpu_bw << ","
+
         << m.tiled_bw << ","
-        << m.halo_bw
+
+        << m.halo_bw << ","
+
+        << m.arithmetic_intensity << ","
+
+        << m.updates_per_sec << ","
+
+        << m.latency_ms
+
         << "\n";
     }
 
     fout.close();
-      cout
-    << "\nresults file created"
+
+    cout
+    << "\n"
+    << filename
+    << " created"
     << endl;
-}
-
-float getQ(
-    Config& cfg,
-    int step,
-    vector<float>& heatProfile)
-{
-    if(cfg.heatMode ==
-       CONSTANT_Q)
-    {
-        return
-            cfg.current
-            *
-            cfg.current
-            *
-            cfg.resistance;
-    }
-
-    return
-        heatProfile[
-            step %
-            heatProfile.size()
-        ];
 }

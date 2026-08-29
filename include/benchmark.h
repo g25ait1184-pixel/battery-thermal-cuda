@@ -11,34 +11,32 @@ using namespace std;
 double benchmarkCPU(
     Config& cfg,
     int N,
-    vector<float>& T,
-    vector<float>& Tnew,
-    vector<float>& heatProfile
+    std::vector<float>& T,
+    std::vector<float>& Tnew,
+    std::vector<float>& heatProfile,
+    std::vector<float>& finalT
 );
-
-// GPU
 
 double benchmarkGPU(
     Config& cfg,
     int N,
-    vector<float>& T,
-    vector<float>& heatProfile
+    std::vector<float>& T,
+    std::vector<float>& heatProfile,
+    std::vector<float>& finalT
 );
-
-// Shared GPU
 
 double benchmarkTiled(
     Config& cfg,
     int N,
-    vector<float>& T,
-    vector<float>& heatProfile
+    std::vector<float>& T,
+    std::vector<float>& heatProfile,
+    std::vector<float>& finalT
 );
-
-// Halo GPU
 
 double benchmarkHalo(
     Config& cfg,
     int N,
-    vector<float>& T,
-    vector<float>& heatProfile
+    std::vector<float>& T,
+    std::vector<float>& heatProfile,
+    std::vector<float>& finalT
 );

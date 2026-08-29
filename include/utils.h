@@ -33,9 +33,7 @@ float getQ(
     vector<float>& heatProfile
 );
 
-// CSV
-
 void saveResultsCSV(
     vector<int>& gridSizes,
-    vector<Metrics>& results
-);
+    vector<Metrics>& results,
+    const string& modelName);
