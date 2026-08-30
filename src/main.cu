@@ -15,6 +15,7 @@
 #include "cuda_events.h"
 #include "battery_model.h"
 #include "validation_metrics.h"
+#include "stream_solver.h"
 
 using namespace std;
 
@@ -33,13 +34,27 @@ int main()
 
 
     //--------------------------------------------------
+    // NSIGHT / CUDA STREAMS EXPERIMENT SETTINGS
+    //--------------------------------------------------
+    // Use a fixed, reproducible workload for the stream
+    // scaling experiment. Only MODEL_V5 is profiled.
+    //--------------------------------------------------
+
+    if(cfg.execMode == NSIGHT_MODE)
+    {
+        cfg.RUNS = 1;
+        cfg.steps = 100;
+
+        cfg.sizes.clear();
+        cfg.sizes.push_back(2048);
+
+        cfg.saveCSV = false;
+        cfg.savePlots = false;
+    }
+
+
+    //--------------------------------------------------
     // Battery Models
-    //
-    // V1 : NASA heat
-    // V2 : NASA + Joule heating
-    // V3 : Temperature-dependent resistance
-    // V4 : Temperature-dependent resistance + entropy
-    // V5 : SOC/SOH-aware electro-thermal model
     //--------------------------------------------------
 
     BatteryModelVersion models[] =
@@ -51,7 +66,6 @@ int main()
         MODEL_V5
     };
 
-
     const char* modelNames[] =
     {
         "MODEL_V1",
@@ -60,7 +74,6 @@ int main()
         "MODEL_V4",
         "MODEL_V5"
     };
-
 
     const int NUM_MODELS = 5;
 
@@ -73,12 +86,12 @@ int main()
     cout << "Battery Electro-Thermal Simulation";
     cout << "\n=====================================\n";
 
-    cout << "\nSOC = "
-         << cfg.soc
+    cout << "\nInitial SOC = "
+         << cfg.initialSOC
          << endl;
 
-    cout << "SOH = "
-         << cfg.soh
+    cout << "Initial SOH = "
+         << cfg.initialSOH
          << endl;
 
     cout << "SOC Resistance Coeff = "
@@ -113,7 +126,6 @@ int main()
         cfg.modelVersion =
             models[modelIndex];
 
-
         cout
             << "\n=====================================\n";
 
@@ -127,7 +139,7 @@ int main()
 
 
         //--------------------------------------------------
-        // Print model description
+        // Model description
         //--------------------------------------------------
 
         switch(cfg.modelVersion)
@@ -140,7 +152,6 @@ int main()
 
                 break;
 
-
             case MODEL_V2:
 
                 cout
@@ -149,7 +160,6 @@ int main()
 
                 break;
 
-
             case MODEL_V3:
 
                 cout
@@ -157,7 +167,6 @@ int main()
                     << endl;
 
                 break;
-
 
             case MODEL_V4:
 
@@ -168,7 +177,6 @@ int main()
 
                 break;
 
-
             case MODEL_V5:
 
                 cout
@@ -176,7 +184,6 @@ int main()
                     << endl;
 
                 break;
-
 
             default:
 
@@ -194,14 +201,12 @@ int main()
 
         vector<float> heatProfile;
 
-
         if(cfg.heatMode == DYNAMIC_Q)
         {
             heatProfile =
                 loadHeatProfile(
                     cfg.resistance
                 );
-
 
             if(heatProfile.empty())
             {
@@ -211,7 +216,6 @@ int main()
 
                 return -1;
             }
-
 
             cout
                 << "\nHeat Mode : DYNAMIC Q"
@@ -229,9 +233,7 @@ int main()
                 cfg.current *
                 cfg.resistance;
 
-
             heatProfile.push_back(Q);
-
 
             cout
                 << "\nHeat Mode : CONSTANT Q"
@@ -257,7 +259,7 @@ int main()
         else if(cfg.execMode == NSIGHT_MODE)
         {
             cout
-                << "Execution Mode : NSIGHT"
+                << "Execution Mode : NSIGHT / CUDA STREAMS"
                 << endl;
         }
         else
@@ -303,19 +305,30 @@ int main()
 
 
         //--------------------------------------------------
-        // CPU vs GPU Validation Results
+        // CPU vs GPU Validation
         //--------------------------------------------------
 
         vector<ValidationMetrics>
             validationResults;
-
 
         vector<string>
             validationModelNames;
 
 
         //--------------------------------------------------
-        // Header
+        // CUDA Streams Results
+        //--------------------------------------------------
+
+        vector<int> streamGridSizes;
+
+        vector<double> stream1Results;
+        vector<double> stream2Results;
+        vector<double> stream4Results;
+        vector<double> stream8Results;
+
+
+        //--------------------------------------------------
+        // Normal-mode CSV header
         //--------------------------------------------------
 
         if(cfg.execMode == NORMAL_MODE)
@@ -354,7 +367,6 @@ int main()
             //--------------------------------------------------
 
             vector<float> T;
-
             vector<float> Tnew;
 
             initializeGrid(
@@ -379,34 +391,21 @@ int main()
             // Runtime variables
             //--------------------------------------------------
 
-            double cpu_ms =
-                0.0;
-
-            double gpu_ms =
-                0.0;
-
-            double tiled_ms =
-                0.0;
-
-            double halo_ms =
-                0.0;
+            double cpu_ms = 0.0;
+            double gpu_ms = 0.0;
+            double tiled_ms = 0.0;
+            double halo_ms = 0.0;
 
 
             //--------------------------------------------------
             // Final temperature fields
             //--------------------------------------------------
 
-            vector<float>
-                finalT_CPU;
-
-            vector<float>
-                finalT_GPU;
-
-            vector<float>
-                finalT_Tiled;
-
-            vector<float>
-                finalT_Halo;
+            vector<float> finalT_CPU;
+            vector<float> finalT_GPU;
+            vector<float> finalT_Tiled;
+            vector<float> finalT_Halo;
+            vector<float> finalT_Streams;
 
 
             //==================================================
@@ -476,49 +475,312 @@ int main()
             //==================================================
             // NSIGHT MODE
             //==================================================
+            //
+            // Dedicated CUDA Streams profiling mode.
+            //
+            // Only MODEL_V5 is profiled here.
+            //
+            // Stream counts:
+            //     1
+            //     2
+            //     4
+            //     8
+            //
+            // This keeps the Nsight timeline clean.
+            //
+            //==================================================
 
             else if(cfg.execMode == NSIGHT_MODE)
             {
                 //--------------------------------------------------
-                // GPU
+                // Only run CUDA Streams for V5
                 //--------------------------------------------------
+                if(cfg.modelVersion == MODEL_V5)
+                {
+                    cout
+                        << "\n"
+                        << "-------------------------------------\n";
 
-                gpu_ms =
-                    benchmarkGPU(
-                        cfg,
-                        N,
-                        T,
-                        heatProfile,
-                        finalT_GPU
+                    cout
+                        << "CUDA Streams Nsight Experiment"
+                        << endl;
+
+                    cout
+                        << "Model : MODEL_V5"
+                        << endl;
+
+                    cout
+                        << "Grid  : "
+                        << N
+                        << " x "
+                        << N
+                        << endl;
+
+                    cout
+                        << "Steps : "
+                        << cfg.steps
+                        << endl;
+
+                    cout
+                        << "-------------------------------------\n";
+
+
+                    //--------------------------------------------------
+                    // Battery Parameters
+                    //--------------------------------------------------
+
+                    BatteryParameters streamParams;
+
+                    streamParams.modelVersion =
+                        cfg.modelVersion;
+
+                    streamParams.current =
+                        cfg.current;
+
+                    streamParams.baseResistance =
+                        cfg.resistance;
+
+                    streamParams.referenceTemperature =
+                        cfg.referenceTemperature;
+
+                    streamParams.resistanceCoeff =
+                        cfg.resistanceCoeff;
+
+                    streamParams.diffusivityCoeff =
+                        cfg.diffusivityCoeff;
+
+                    streamParams.entropyCoeff =
+                        cfg.entropyCoeff;
+
+
+                    //--------------------------------------------------
+                    // V5 SOC / SOH
+                    //--------------------------------------------------
+
+                    streamParams.soc =
+                        cfg.initialSOC;
+
+                    streamParams.soh =
+                        cfg.initialSOH;
+
+
+                    streamParams.socResistanceCoeff =
+                        cfg.socResistanceCoeff;
+
+                    streamParams.sohResistanceCoeff =
+                        cfg.sohResistanceCoeff;
+
+                    streamParams.socHeatCoeff =
+                        cfg.socHeatCoeff;
+
+                    streamParams.sohHeatCoeff =
+                        cfg.sohHeatCoeff;
+
+
+                    //--------------------------------------------------
+                    // Stream counts
+                    //--------------------------------------------------
+
+                    const int streamCounts[] =
+                    {
+                        1,
+                        2,
+                        4,
+                        8
+                    };
+
+
+                    double streamTimes[4] =
+                    {
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    };
+
+
+                    //--------------------------------------------------
+                    // Run stream experiments
+                    //--------------------------------------------------
+
+                    for(int si = 0;
+                        si < 4;
+                        si++)
+                    {
+                        int numStreams =
+                            streamCounts[si];
+
+                        double totalStreamTime =
+                            0.0;
+
+
+                        //--------------------------------------------------
+                        // Benchmark repetitions
+                        //
+                        // In NSIGHT mode cfg.RUNS is normally 1.
+                        //--------------------------------------------------
+
+                        for(int r = 0;
+                            r < cfg.RUNS;
+                            r++)
+                        {
+                            vector<float>
+                                streamFinalT;
+
+
+                            double elapsed =
+                                runCUDAStreams(
+                                    numStreams,
+                                    N,
+                                    cfg.alpha,
+                                    cfg.steps,
+                                    cfg.beta,
+                                    streamParams,
+                                    T,
+                                    heatProfile,
+                                    streamFinalT
+                                );
+
+
+                            totalStreamTime +=
+                                elapsed;
+
+
+                            if(r == cfg.RUNS - 1)
+                            {
+                                finalT_Streams =
+                                    streamFinalT;
+                            }
+                        }
+
+
+                        //--------------------------------------------------
+                        // Average
+                        //--------------------------------------------------
+
+                        if(cfg.RUNS > 0)
+                        {
+                            streamTimes[si] =
+                                totalStreamTime /
+                                static_cast<double>(
+                                    cfg.RUNS
+                                );
+                        }
+
+
+                        //--------------------------------------------------
+                        // Print result
+                        //--------------------------------------------------
+
+                        cout
+                            << fixed
+                            << setprecision(4)
+                            << numStreams
+                            << " Stream(s) : "
+                            << streamTimes[si]
+                            << " ms"
+                            << endl;
+                    }
+
+
+                    //--------------------------------------------------
+                    // Stream scaling
+                    //--------------------------------------------------
+
+                    double baseline =
+                        streamTimes[0];
+
+
+                    cout
+                        << "\nCUDA Stream Scaling"
+                        << endl;
+
+                    cout
+                        << "-------------------------------------\n";
+
+
+                    for(int si = 0;
+                        si < 4;
+                        si++)
+                    {
+                        double speedup =
+                            0.0;
+
+                        double efficiency =
+                            0.0;
+
+
+                        if(streamTimes[si] > 0.0 &&
+                           baseline > 0.0)
+                        {
+                            speedup =
+                                baseline /
+                                streamTimes[si];
+
+                            efficiency =
+                                speedup /
+                                static_cast<double>(
+                                    streamCounts[si]
+                                ) *
+                                100.0;
+                        }
+
+
+                        cout
+                            << streamCounts[si]
+                            << " Stream(s)"
+                            << " | Time = "
+                            << streamTimes[si]
+                            << " ms"
+                            << " | Speedup = "
+                            << speedup
+                            << "x"
+                            << " | Efficiency = "
+                            << efficiency
+                            << "%"
+                            << endl;
+                    }
+
+
+                    cout
+                        << "-------------------------------------\n";
+
+
+                    //--------------------------------------------------
+                    // Store results
+                    //--------------------------------------------------
+
+                    streamGridSizes.push_back(
+                        N
                     );
 
-
-                //--------------------------------------------------
-                // Tiled
-                //--------------------------------------------------
-
-                tiled_ms =
-                    benchmarkTiled(
-                        cfg,
-                        N,
-                        T,
-                        heatProfile,
-                        finalT_Tiled
+                    stream1Results.push_back(
+                        streamTimes[0]
                     );
 
-
-                //--------------------------------------------------
-                // Halo
-                //--------------------------------------------------
-
-                halo_ms =
-                    benchmarkHalo(
-                        cfg,
-                        N,
-                        T,
-                        heatProfile,
-                        finalT_Halo
+                    stream2Results.push_back(
+                        streamTimes[1]
                     );
+
+                    stream4Results.push_back(
+                        streamTimes[2]
+                    );
+
+                    stream8Results.push_back(
+                        streamTimes[3]
+                    );
+                }
+                else
+                {
+                    //--------------------------------------------------
+                    // Do not profile V1-V4 in NSIGHT stream mode
+                    //--------------------------------------------------
+
+                    cout
+                        << "NSIGHT stream experiment skipped for "
+                        << modelNames[modelIndex]
+                        << endl;
+                }
             }
 
 
@@ -633,10 +895,6 @@ int main()
                 // THERMAL METRICS
                 //==================================================
 
-                //--------------------------------------------------
-                // CPU
-                //--------------------------------------------------
-
                 if(!finalT_CPU.empty())
                 {
                     ThermalMetrics cpuThermal =
@@ -650,10 +908,6 @@ int main()
                     );
                 }
 
-
-                //--------------------------------------------------
-                // GPU
-                //--------------------------------------------------
 
                 if(!finalT_GPU.empty())
                 {
@@ -669,10 +923,6 @@ int main()
                 }
 
 
-                //--------------------------------------------------
-                // Tiled
-                //--------------------------------------------------
-
                 if(!finalT_Tiled.empty())
                 {
                     ThermalMetrics tiledThermal =
@@ -686,10 +936,6 @@ int main()
                     );
                 }
 
-
-                //--------------------------------------------------
-                // Halo
-                //--------------------------------------------------
 
                 if(!finalT_Halo.empty())
                 {
@@ -723,9 +969,10 @@ int main()
                         validation
                     );
 
-
                     validationModelNames.push_back(
-                        string(modelNames[modelIndex])
+                        string(
+                            modelNames[modelIndex]
+                        )
                     );
 
 
@@ -791,10 +1038,6 @@ int main()
 
         if(cfg.saveCSV)
         {
-            //--------------------------------------------------
-            // CPU
-            //--------------------------------------------------
-
             if(!cpuThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -805,10 +1048,6 @@ int main()
                 );
             }
 
-
-            //--------------------------------------------------
-            // GPU
-            //--------------------------------------------------
 
             if(!gpuThermalResults.empty())
             {
@@ -821,10 +1060,6 @@ int main()
             }
 
 
-            //--------------------------------------------------
-            // Tiled
-            //--------------------------------------------------
-
             if(!tiledThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -835,10 +1070,6 @@ int main()
                 );
             }
 
-
-            //--------------------------------------------------
-            // Halo
-            //--------------------------------------------------
 
             if(!haloThermalResults.empty())
             {
@@ -870,6 +1101,63 @@ int main()
                     gridSizes,
                     validationResults
                 );
+            }
+
+
+            //==================================================
+            // CUDA STREAMS CSV
+            //==================================================
+
+            if(cfg.modelVersion == MODEL_V5 &&
+               !streamGridSizes.empty())
+            {
+                string streamFilename =
+                    string(RESULT_DIR) +
+                    "cuda_streams_MODEL_V5.csv";
+
+
+                ofstream streamFile(
+                    streamFilename
+                );
+
+
+                if(streamFile.is_open())
+                {
+                    streamFile
+                        << "Grid,"
+                        << "Streams_1,"
+                        << "Streams_2,"
+                        << "Streams_4,"
+                        << "Streams_8"
+                        << "\n";
+
+
+                    for(size_t i = 0;
+                        i < streamGridSizes.size();
+                        i++)
+                    {
+                        streamFile
+                            << streamGridSizes[i]
+                            << ","
+                            << stream1Results[i]
+                            << ","
+                            << stream2Results[i]
+                            << ","
+                            << stream4Results[i]
+                            << ","
+                            << stream8Results[i]
+                            << "\n";
+                    }
+
+
+                    streamFile.close();
+
+
+                    cout
+                        << "\nCUDA Streams results saved to: "
+                        << streamFilename
+                        << endl;
+                }
             }
         }
 
@@ -914,6 +1202,10 @@ int main()
 
     cout
         << "V1 -> V5"
+        << endl;
+
+    cout
+        << "V5 CUDA Streams Benchmark Completed"
         << endl;
 
     cout

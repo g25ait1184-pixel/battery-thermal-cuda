@@ -1,64 +1,15 @@
-# V1→V5 Validation Results
 
-## Scope
+=====================================
+Battery Electro-Thermal Simulation
+=====================================
 
-This file records the complete execution output for the battery electro-thermal simulation models **V1 through V5**.
+Initial SOC = 1
+Initial SOH = 1
+SOC Resistance Coeff = 0.2
+SOH Resistance Coeff = 0.5
+SOC Heat Coeff = 0.1
+SOH Heat Coeff = 0.2
 
-- Heat input: **NASA battery dataset**
-- Heat samples: **1,698**
-- Heat mode: **DYNAMIC Q**
-- Execution mode: **NORMAL**
-- Tested grids: **256×256, 512×512, 1024×1024, 2048×2048**
-- Implementations benchmarked: **CPU, Global GPU, Tiled GPU, Halo GPU**
-
-## Model Progression
-
-| Model | Formulation |
-|---|---|
-| **V1** | NASA heat only |
-| **V2** | NASA heat + Joule heating |
-| **V3** | NASA heat + temperature-dependent resistance |
-| **V4** | NASA heat + temperature-dependent resistance + entropy heat |
-| **V5** | SOC/SOH-aware electro-thermal model |
-
-## V5 Validation Summary
-
-| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
-|---|---:|---:|---:|---:|
-| 256×256 | 1.60e-06 | 1.53e-05 | 1.26e-06 | 5.02e-08 |
-| 512×512 | 1.75e-06 | 2.29e-05 | 1.54e-06 | 5.47e-08 |
-| 1024×1024 | 1.81e-06 | 1.53e-05 | 1.67e-06 | 5.63e-08 |
-| 2048×2048 | 1.84e-06 | 1.53e-05 | 1.74e-06 | 5.72e-08 |
-
-## V5 Performance — 2048×2048
-
-| Metric | Global GPU | Tiled GPU | Halo GPU |
-|---|---:|---:|---:|
-| Speedup | 1001.81× | 1045.27× | **1096.88×** |
-| GFLOPS | 128.87 | 134.47 | **141.10** |
-| Bandwidth (GB/s) | 441.86 | 461.02 | **483.79** |
-| Arithmetic Intensity | 0.29 | 0.29 | 0.29 |
-| Updates/sec | 18,410,666,313.14 | — | — |
-| Latency (ms) | 0.23 | — | — |
-
-## Generated V5 Result Files
-
-The V5 execution generated:
-
-- `results_MODEL_V5.csv`
-- `thermal_metrics_MODEL_V5_CPU.csv`
-- `thermal_metrics_MODEL_V5_GPU.csv`
-- `thermal_metrics_MODEL_V5_Tiled.csv`
-- `thermal_metrics_MODEL_V5_Halo.csv`
-- `validation_MODEL_V5.csv`
-- thermal map output
-- center-temperature output
-
----
-
-## Complete Execution Record
-
-```text
 =====================================
 Running MODEL_V1
 =====================================
@@ -78,7 +29,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 1.22243e-08 to 0.022309
 =====================================
-256,228.64,8.78,0.88,0.96,26.03,259.85,238.97,5.14,51.33,47.20,17.63,175.98,161.84,0.29,734571995.52,0.09
+256,207.42,1.33,1.06,1.14,156.20,195.40,182.26,34.01,42.54,39.68,116.60,145.86,136.05,0.29,4858366615.10,0.01
 
 CPU vs GPU Validation
 Model             : MODEL_V1
@@ -95,7 +46,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-512,1084.98,1.94,2.16,2.18,559.34,503.10,497.75,93.86,84.42,83.53,321.81,289.45,286.38,0.29,13408775742.24,0.02
+512,962.77,1.95,2.16,2.55,494.11,444.90,377.25,93.44,84.13,71.34,320.37,288.46,244.60,0.29,13348724310.62,0.02
 
 CPU vs GPU Validation
 Model             : MODEL_V1
@@ -112,7 +63,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-1024,4217.30,7.80,7.45,5.09,540.64,565.77,828.69,93.73,98.09,143.67,321.36,336.29,492.57,0.29,13389850967.84,0.08
+1024,3640.07,7.80,6.28,4.50,466.93,579.46,808.18,93.79,116.39,162.33,321.56,399.05,556.56,0.29,13398238252.49,0.08
 
 CPU vs GPU Validation
 Model             : MODEL_V1
@@ -129,7 +80,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-2048,16767.11,21.69,19.65,18.17,772.87,853.10,923.01,135.07,149.09,161.31,463.10,511.17,553.06,0.29,19295715904.04,0.22
+2048,14789.72,21.70,19.93,18.06,681.44,742.09,818.71,135.01,147.03,162.21,462.90,504.10,556.15,0.29,19287597744.62,0.22
 
 CPU vs GPU Validation
 Model             : MODEL_V1
@@ -175,7 +126,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-256,228.30,0.80,0.87,0.96,284.61,263.24,237.95,96.52,89.27,80.69,193.03,178.54,161.38,0.50,8042960895.33,0.01
+256,197.61,0.80,0.86,0.95,247.27,229.62,207.05,96.88,89.96,81.12,193.75,179.92,162.24,0.50,8073041165.90,0.01
 
 CPU vs GPU Validation
 Model             : MODEL_V2
@@ -192,7 +143,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-512,1094.45,1.99,2.14,2.16,551.07,511.91,505.75,157.16,145.99,144.23,314.31,291.98,288.46,0.50,13096349629.02,0.02
+512,893.60,1.91,2.14,2.55,466.80,418.41,350.19,163.05,146.14,122.32,326.09,292.29,244.63,0.50,13587172305.91,0.02
 
 CPU vs GPU Validation
 Model             : MODEL_V2
@@ -209,7 +160,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-1024,4176.53,7.18,6.33,4.56,581.45,660.24,915.96,174.49,198.14,274.88,348.99,396.28,549.76,0.50,14541094186.33,0.07
+1024,3729.29,7.66,5.81,4.95,486.59,641.68,753.67,163.54,215.66,253.30,327.08,431.33,506.60,0.50,13628327983.35,0.08
 
 CPU vs GPU Validation
 Model             : MODEL_V2
@@ -226,7 +177,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-2048,16882.72,22.77,20.67,19.82,741.39,816.66,851.81,220.60,242.99,253.45,441.19,485.99,506.90,0.50,18382934555.85,0.23
+2048,14649.10,22.44,19.67,18.02,652.90,744.83,813.16,223.89,255.41,278.84,447.77,510.82,557.68,0.50,18657263928.64,0.22
 
 CPU vs GPU Validation
 Model             : MODEL_V2
@@ -272,7 +223,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-256,300.63,0.82,0.88,0.96,368.53,341.16,314.27,142.36,131.78,121.40,189.81,175.71,161.86,0.75,7908760655.69,0.01
+256,208.84,0.81,0.88,0.95,256.90,236.37,218.82,142.86,131.44,121.68,190.47,175.25,162.24,0.75,7936437686.37,0.01
 
 CPU vs GPU Validation
 Model             : MODEL_V3
@@ -289,7 +240,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-512,951.53,1.95,2.16,2.39,487.06,439.65,398.47,239.65,216.32,196.06,319.53,288.43,261.41,0.75,13313773029.28,0.02
+512,944.77,1.95,2.18,2.55,484.94,434.03,370.03,240.31,215.08,183.37,320.41,286.78,244.49,0.75,13350544028.95,0.02
 
 CPU vs GPU Validation
 Model             : MODEL_V3
@@ -306,7 +257,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-1024,3988.23,7.86,6.63,5.11,507.57,601.39,780.62,239.27,283.50,367.99,319.03,378.00,490.65,0.75,13292789295.03,0.08
+1024,3598.16,7.71,5.44,4.68,466.44,661.49,768.60,243.72,345.64,401.60,324.96,460.85,535.47,0.75,13539850547.03,0.08
 
 CPU vs GPU Validation
 Model             : MODEL_V3
@@ -323,7 +274,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-2048,15973.15,23.30,21.20,20.72,685.52,753.30,770.93,323.38,355.35,363.67,431.18,473.80,484.89,0.75,17965695487.41,0.23
+2048,14619.66,22.25,19.90,18.33,657.20,734.78,797.64,338.72,378.71,411.11,451.63,504.94,548.14,0.75,18817993640.45,0.22
 
 CPU vs GPU Validation
 Model             : MODEL_V3
@@ -369,7 +320,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-256,303.87,0.81,0.87,0.96,375.62,348.75,317.74,199.37,185.11,168.65,191.40,177.71,161.91,1.04,7974831037.46,0.01
+256,199.36,0.81,0.87,0.95,246.84,228.10,209.17,199.70,184.54,169.22,191.72,177.15,162.45,1.04,7988196817.67,0.01
 
 CPU vs GPU Validation
 Model             : MODEL_V4
@@ -386,7 +337,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-512,963.29,1.95,2.17,2.55,494.51,444.70,377.33,333.81,300.19,254.71,320.46,288.18,244.52,1.04,13352298629.02,0.02
+512,957.89,1.94,2.15,2.34,492.62,444.64,409.42,334.41,301.84,277.93,321.04,289.77,266.81,1.04,13376469879.92,0.02
 
 CPU vs GPU Validation
 Model             : MODEL_V4
@@ -403,7 +354,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-1024,4021.11,7.35,6.12,5.00,546.81,656.81,804.79,355.08,426.52,522.61,340.88,409.46,501.71,1.04,14203372887.77,0.07
+1024,3622.77,7.68,5.41,4.75,471.49,669.44,762.26,339.84,482.51,549.42,326.25,463.21,527.44,1.04,13593685661.90,0.08
 
 CPU vs GPU Validation
 Model             : MODEL_V4
@@ -420,7 +371,7 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-2048,15565.53,23.05,21.00,20.26,675.30,741.24,768.22,454.03,498.36,516.50,435.87,478.43,495.84,1.04,18161224185.83,0.23
+2048,14654.37,21.76,19.76,18.15,673.57,741.67,807.55,481.02,529.66,576.71,461.78,508.47,553.64,1.04,19240831368.52,0.22
 
 CPU vs GPU Validation
 Model             : MODEL_V4
@@ -466,7 +417,25 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-256,311.83,0.81,0.89,0.96,386.67,350.68,326.13,56.00,50.79,47.23,192.01,174.13,161.94,0.29,8000210260.41,0.01
+
+-------------------------------------
+CUDA Streams Benchmark
+Model : MODEL_V5
+Grid  : 256 x 256
+-------------------------------------
+1 Stream(s) : 0.8069 ms
+2 Stream(s) : 1.1225 ms
+4 Stream(s) : 1.9653 ms
+8 Stream(s) : 2.9740 ms
+
+CUDA Stream Scaling
+-------------------------------------
+1 Stream(s) | Time = 0.8069 ms | Speedup = 1.0000x | Efficiency = 100.0000%
+2 Stream(s) | Time = 1.1225 ms | Speedup = 0.7189x | Efficiency = 35.9431%
+4 Stream(s) | Time = 1.9653 ms | Speedup = 0.4106x | Efficiency = 10.2650%
+8 Stream(s) | Time = 2.9740 ms | Speedup = 0.2713x | Efficiency = 3.3916%
+-------------------------------------
+256,298.86,0.81,0.89,0.95,370.45,336.72,313.31,55.98,50.88,47.35,191.93,174.45,162.33,0.29,7997068739.18,0.01
 
 CPU vs GPU Validation
 Model             : MODEL_V5
@@ -483,7 +452,25 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-512,1412.12,1.94,2.20,2.55,728.73,643.15,554.83,93.96,82.92,71.54,322.14,284.31,245.27,0.29,13422515337.06,0.02
+
+-------------------------------------
+CUDA Streams Benchmark
+Model : MODEL_V5
+Grid  : 512 x 512
+-------------------------------------
+1 Stream(s) : 1.9356 ms
+2 Stream(s) : 2.6517 ms
+4 Stream(s) : 4.9919 ms
+8 Stream(s) : 8.5800 ms
+
+CUDA Stream Scaling
+-------------------------------------
+1 Stream(s) | Time = 1.9356 ms | Speedup = 1.0000x | Efficiency = 100.0000%
+2 Stream(s) | Time = 2.6517 ms | Speedup = 0.7299x | Efficiency = 36.4974%
+4 Stream(s) | Time = 4.9919 ms | Speedup = 0.3877x | Efficiency = 9.6937%
+8 Stream(s) | Time = 8.5800 ms | Speedup = 0.2256x | Efficiency = 2.8199%
+-------------------------------------
+512,1335.25,1.94,2.19,2.55,688.40,609.70,524.52,93.87,83.14,71.52,321.83,285.04,245.22,0.29,13409627523.52,0.02
 
 CPU vs GPU Validation
 Model             : MODEL_V5
@@ -500,7 +487,25 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-1024,5708.67,7.80,6.63,5.07,731.69,860.48,1125.42,93.71,110.21,144.14,321.30,377.85,494.19,0.29,13387368706.67,0.08
+
+-------------------------------------
+CUDA Streams Benchmark
+Model : MODEL_V5
+Grid  : 1024 x 1024
+-------------------------------------
+1 Stream(s) : 4.3649 ms
+2 Stream(s) : 8.4105 ms
+4 Stream(s) : 17.1389 ms
+8 Stream(s) : 34.9308 ms
+
+CUDA Stream Scaling
+-------------------------------------
+1 Stream(s) | Time = 4.3649 ms | Speedup = 1.0000x | Efficiency = 100.0000%
+2 Stream(s) | Time = 8.4105 ms | Speedup = 0.5190x | Efficiency = 25.9490%
+4 Stream(s) | Time = 17.1389 ms | Speedup = 0.2547x | Efficiency = 6.3669%
+8 Stream(s) | Time = 34.9308 ms | Speedup = 0.1250x | Efficiency = 1.5620%
+-------------------------------------
+1024,5360.77,7.79,6.72,4.84,687.82,797.46,1107.51,93.81,108.76,151.05,321.63,372.90,517.89,0.29,13401321533.75,0.08
 
 CPU vs GPU Validation
 Model             : MODEL_V5
@@ -517,7 +522,25 @@ Heat Profile Size : 1698
 Resistance (Ohm) : 0.01
 Heat Source Range : 0.00 to 0.02
 =====================================
-2048,22778.58,22.74,21.79,20.77,1001.81,1045.27,1096.88,128.87,134.47,141.10,441.86,461.02,483.79,0.29,18410666313.14,0.23
+
+-------------------------------------
+CUDA Streams Benchmark
+Model : MODEL_V5
+Grid  : 2048 x 2048
+-------------------------------------
+1 Stream(s) : 16.9231 ms
+2 Stream(s) : 34.3743 ms
+4 Stream(s) : 73.2904 ms
+8 Stream(s) : 156.4075 ms
+
+CUDA Stream Scaling
+-------------------------------------
+1 Stream(s) | Time = 16.9231 ms | Speedup = 1.0000x | Efficiency = 100.0000%
+2 Stream(s) | Time = 34.3743 ms | Speedup = 0.4923x | Efficiency = 24.6159%
+4 Stream(s) | Time = 73.2904 ms | Speedup = 0.2309x | Efficiency = 5.7726%
+8 Stream(s) | Time = 156.4075 ms | Speedup = 0.1082x | Efficiency = 1.3525%
+-------------------------------------
+2048,21480.18,22.13,20.18,18.06,970.56,1064.33,1189.49,132.40,145.19,162.27,453.95,497.81,556.35,0.29,18914516269.33,0.22
 
 CPU vs GPU Validation
 Model             : MODEL_V5
@@ -538,14 +561,16 @@ Relative Error    : 5.72e-08
 /content/drive/MyDrive/CUDA_Project/project/results/thermal_metrics_MODEL_V5_Halo.csv created
 /content/drive/MyDrive/CUDA_Project/project/results/validation_MODEL_V5.csv created
 
+CUDA Streams results saved to: /content/drive/MyDrive/CUDA_Project/project/results/cuda_streams_MODEL_V5.csv
+
 thermal_map file created
 
 center_temp file created
 
 Finished MODEL_V5
-```
 
----
-
-This record corresponds to the supplied V1→V5 execution output. The run concludes with **All Battery Models Completed — V1 → V5**.
-
+=====================================
+All Battery Models Completed
+V1 -> V5
+V5 CUDA Streams Benchmark Completed
+=====================================
