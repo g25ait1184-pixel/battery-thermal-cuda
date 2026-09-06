@@ -16,6 +16,8 @@
 #include "battery_model.h"
 #include "validation_metrics.h"
 #include "stream_solver.h"
+#include "generate_v5_dataset.h"
+
 
 using namespace std;
 
@@ -31,6 +33,15 @@ int main()
     //--------------------------------------------------
 
     Config cfg = initConfig();
+
+    //==================================================
+    // V5 DATASET GENERATION
+    //==================================================
+    // Keep disabled while validating the corrected V5
+    // physics, numerical accuracy, CUDA Streams, and
+    // Nsight results. Enable only after the baseline
+    // is frozen.
+    constexpr bool ENABLE_V5_DATASET_GENERATION = true;
 
 
     //--------------------------------------------------
@@ -1172,6 +1183,40 @@ int main()
                 cfg,
                 heatProfile
             );
+        }
+
+
+        //======================================================
+        // V5 DATASET GENERATION
+        //======================================================
+        //
+        // Uses the SAME heat profile and Config already used
+        // by the validated V5 simulation. The generator calls
+        // the existing runGPU() path and therefore uses the
+        // corrected gpuStencil() / V5 physics.
+        //
+        // Disabled by default so normal, Streams, and Nsight
+        // validation runs are not affected.
+        //
+        //======================================================
+
+        if(cfg.modelVersion == MODEL_V5 &&
+           cfg.execMode == NORMAL_MODE &&
+           ENABLE_V5_DATASET_GENERATION)
+        {
+            cout
+                << "\n=====================================\n"
+                << "Starting V5 Dataset Generation"
+                << "\n=====================================\n";
+
+            generateV5Dataset(
+                cfg,
+                heatProfile
+            );
+
+            cout
+                << "\nV5 Dataset Generation Completed"
+                << endl;
         }
 
 

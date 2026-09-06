@@ -1,38 +1,6 @@
 # battery-thermal-cuda
 
-GPU-Accelerated Battery Electro-Thermal Simulation and Thermal Propagation Framework using CUDA, with Global Memory, Shared Memory, and Halo optimization.
-
-## Current Release
-
-**v1.0.0 — Complete V1→V5 Validated Thermal Solver**
-
-This release consolidates the completed V1→V5 battery electro-thermal model progression and the corresponding CPU/GPU, tiled, and halo validation results. The V1→V5 execution completed successfully for 256×256, 512×512, 1024×1024, and 2048×2048 grids.
-
-### V1→V5 Model Evolution
-
-| Model | Thermal formulation |
-|---|---|
-| **V1** | NASA heat only |
-| **V2** | NASA heat + Joule heating |
-| **V3** | NASA heat + temperature-dependent resistance |
-| **V4** | NASA heat + temperature-dependent resistance + entropy heat |
-| **V5** | SOC/SOH-aware electro-thermal model |
-
-The execution uses **1,698 NASA heat samples** with dynamic heat input. The supplied results show CPU-vs-GPU validation errors remaining in the micro-/sub-micro-degree range across the tested grids.
-
-## Release Roadmap
-
-```text
-v0.1.0  → NASA Heat V1 baseline
-v1.0.0  → Complete V1→V5 validated thermal solver
-v1.1.0  → CUDA Streams integration
-v1.2.0  → Performance validation
-v1.3.0  → V5 simulation dataset generation
-v2.0.0  → AI thermal predictor
-v2.1.0  → Physics + AI residual correction
-v3.0.0  → Battery Thermal Digital Twin
-v3.1.0  → Final integrated benchmark
-```
+GPU-Accelerated Battery Thermal Propagation Simulator using CUDA with Global Memory, Shared Memory, and Halo Optimization.
 
 ---
 
@@ -485,7 +453,7 @@ The experimental results demonstrate that:
 
 ---
 
-# Future Work and Next Development Stages
+# Future Work
 
 Temperature-dependent resistance:
 
@@ -493,7 +461,7 @@ Temperature-dependent resistance:
 R(T)=R_0(1+\alpha(T-T_0))
 ```
 
-Planned extensions and roadmap:
+Planned extensions:
 
 * Electro-thermal coupling
 * SOC estimation
@@ -507,162 +475,8 @@ Planned extensions and roadmap:
 
 ---
 
-
-# V1→V5 Electro-Thermal Model Evolution and Results
-
-This release contains the complete **V1→V5 battery electro-thermal model progression**. All five models were executed using the NASA battery heat profile with **1,698 heat samples**, dynamic heat input, and normal execution mode.
-
-## Model Evolution
-
-| Model | Model description | Main addition |
-|---|---|---|
-| **V1** | NASA heat only | Dynamic NASA heat input |
-| **V2** | NASA heat + Joule heating | Electrical resistive heat generation |
-| **V3** | NASA heat + temperature-dependent resistance | Resistance varies with temperature |
-| **V4** | NASA heat + temperature-dependent resistance + entropy heat | Entropic heat contribution |
-| **V5** | SOC/SOH-aware electro-thermal model | SOC/SOH-dependent electro-thermal behavior |
-
-### Common Simulation Configuration
-
-- **SOC:** 1
-- **SOH:** 1
-- **SOC Resistance Coefficient:** 0.2
-- **SOH Resistance Coefficient:** 0.5
-- **SOC Heat Coefficient:** 0.1
-- **SOH Heat Coefficient:** 0.2
-- **Heat Mode:** `DYNAMIC Q`
-- **Heat profile:** 1,698 samples
-- **Resistance:** 0.01 Ω
-- **Grid sizes:** 256×256, 512×512, 1024×1024, 2048×2048
-- **Execution mode:** `NORMAL`
-
-## V1 — NASA Heat Only
-
-V1 uses the NASA heat profile directly as the thermal source. The supplied run completed successfully for all four grid sizes.
-
-### V1 CPU vs GPU Validation
-
-| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
-|---|---:|---:|---:|---:|
-| 256×256 | 7.22e-08 | 3.81e-06 | 1.80e-09 | 2.58e-09 |
-| 512×512 | 7.56e-08 | 7.63e-06 | 2.08e-09 | 2.69e-09 |
-| 1024×1024 | 2.67e-08 | 3.81e-06 | 3.24e-10 | 9.50e-10 |
-| 2048×2048 | 1.65e-08 | 7.63e-06 | 6.46e-11 | 5.86e-10 |
-
-### V1 Performance
-
-| Grid | CPU (ms) | GPU (ms) | Tiled (ms) | Halo (ms) | GPU Speedup | Tiled Speedup | Halo Speedup |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 256×256 | 228.64 | 8.78 | 0.88 | 0.96 | 26.03× | 259.85× | 238.97× |
-| 512×512 | 1084.98 | 1.94 | 2.16 | 2.18 | 559.34× | 503.10× | 497.75× |
-| 1024×1024 | 4217.30 | 7.80 | 7.45 | 5.09 | 540.64× | 565.77× | 828.69× |
-| 2048×2048 | 16767.11 | 21.69 | 19.65 | 18.17 | 772.87× | 853.10× | 923.01× |
-
-## V2 — NASA Heat + Joule Heating
-
-V2 extends the thermal model by adding **Joule heating** to the NASA heat source.
-
-### V2 CPU vs GPU Validation
-
-| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
-|---|---:|---:|---:|---:|
-| 256×256 | 4.45e-07 | 1.53e-05 | 5.86e-08 | 1.40e-08 |
-| 512×512 | 3.43e-07 | 1.53e-05 | 2.83e-08 | 1.07e-08 |
-| 1024×1024 | 3.45e-07 | 2.29e-05 | 2.45e-08 | 1.08e-08 |
-| 2048×2048 | 2.97e-07 | 1.53e-05 | 1.82e-08 | 9.27e-09 |
-
-### V2 Performance
-
-| Grid | CPU (ms) | GPU (ms) | Tiled (ms) | Halo (ms) | GPU Speedup | Tiled Speedup | Halo Speedup |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 256×256 | 228.30 | 0.80 | 0.87 | 0.96 | 284.61× | 263.24× | 237.95× |
-| 512×512 | 1094.45 | 1.99 | 2.14 | 2.16 | 551.07× | 511.91× | 505.75× |
-| 1024×1024 | 4176.53 | 7.18 | 6.33 | 4.56 | 581.45× | 660.24× | 915.96× |
-| 2048×2048 | 16882.72 | 22.77 | 20.67 | 19.82 | 741.39× | 816.66× | 851.81× |
-
-## V3 — Temperature-Dependent Resistance
-
-V3 extends V2 with **temperature-dependent resistance**.
-
-### V3 CPU vs GPU Validation
-
-| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
-|---|---:|---:|---:|---:|
-| 256×256 | 1.60e-06 | 1.53e-05 | 1.26e-06 | 5.02e-08 |
-| 512×512 | 1.75e-06 | 2.29e-05 | 1.54e-06 | 5.47e-08 |
-| 1024×1024 | 1.81e-06 | 1.53e-05 | 1.67e-06 | 5.63e-08 |
-| 2048×2048 | 1.84e-06 | 1.53e-05 | 1.74e-06 | 5.72e-08 |
-
-### V3 Performance
-
-| Grid | CPU (ms) | GPU (ms) | Tiled (ms) | Halo (ms) | GPU Speedup | Tiled Speedup | Halo Speedup |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 256×256 | 300.63 | 0.82 | 0.88 | 0.96 | 368.53× | 341.16× | 314.27× |
-| 512×512 | 951.53 | 1.95 | 2.16 | 2.39 | 487.06× | 439.65× | 398.47× |
-| 1024×1024 | 3988.23 | 7.86 | 6.63 | 5.11 | 507.57× | 601.39× | 780.62× |
-| 2048×2048 | 15973.15 | 23.30 | 21.20 | 20.72 | 685.52× | 753.30× | 770.93× |
-
-## V4 — Entropy Heat
-
-V4 extends V3 by adding **entropy heat** to the temperature-dependent electro-thermal model.
-
-### V4 CPU vs GPU Validation
-
-| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
-|---|---:|---:|---:|---:|
-| 256×256 | 1.60e-06 | 1.53e-05 | 1.26e-06 | 5.02e-08 |
-| 512×512 | 1.75e-06 | 2.29e-05 | 1.54e-06 | 5.47e-08 |
-| 1024×1024 | 1.81e-06 | 1.53e-05 | 1.67e-06 | 5.63e-08 |
-| 2048×2048 | 1.84e-06 | 1.53e-05 | 1.74e-06 | 5.72e-08 |
-
-### V4 Performance
-
-| Grid | CPU (ms) | GPU (ms) | Tiled (ms) | Halo (ms) | GPU Speedup | Tiled Speedup | Halo Speedup |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 256×256 | 303.87 | 0.81 | 0.87 | 0.96 | 375.62× | 348.75× | 317.74× |
-| 512×512 | 963.29 | 1.95 | 2.17 | 2.55 | 494.51× | 444.70× | 377.33× |
-| 1024×1024 | 4021.11 | 7.35 | 6.12 | 5.00 | 546.81× | 656.81× | 804.79× |
-| 2048×2048 | 15565.53 | 23.05 | 21.00 | 20.26 | 675.30× | 741.24× | 768.22× |
-
-## V5 — SOC/SOH-Aware Electro-Thermal Model
-
-V5 is the current physics-model endpoint of this release and implements the **SOC/SOH-aware electro-thermal model**.
-
-### V5 CPU vs GPU Validation
-
-| Grid | RMSE (°C) | Max Error (°C) | Mean Error (°C) | Relative Error |
-|---|---:|---:|---:|---:|
-| 256×256 | 1.60e-06 | 1.53e-05 | 1.26e-06 | 5.02e-08 |
-| 512×512 | 1.75e-06 | 2.29e-05 | 1.54e-06 | 5.47e-08 |
-| 1024×1024 | 1.81e-06 | 1.53e-05 | 1.67e-06 | 5.63e-08 |
-| 2048×2048 | 1.84e-06 | 1.53e-05 | 1.74e-06 | 5.72e-08 |
-
-### V5 Performance
-
-| Grid | CPU (ms) | GPU (ms) | Tiled (ms) | Halo (ms) | GPU Speedup | Tiled Speedup | Halo Speedup | AI |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 256×256 | 311.83 | 0.81 | 0.89 | 0.96 | 386.67× | 350.68× | 326.13× | 0.29 |
-| 512×512 | 1412.12 | 1.94 | 2.20 | 2.55 | 728.73× | 643.15× | 554.83× | 0.29 |
-| 1024×1024 | 5708.67 | 7.80 | 6.63 | 5.07 | 731.69× | 860.48× | 1125.42× | 0.29 |
-| 2048×2048 | 22778.58 | 22.74 | 21.79 | 20.77 | 1001.81× | 1045.27× | **1096.88×** | 0.29 |
-
-> **Note:** The final column above is the supplied **Arithmetic Intensity** value; it is labeled `AI` only to keep the table compact.
-
-### V5 Throughput and Bandwidth
-
-At 2048×2048:
-
-| Metric | Global GPU | Tiled GPU | Halo GPU |
-|---|---:|---:|---:|
-| GFLOPS | 128.87 | 134.47 | **141.10** |
-| Bandwidth (GB/s) | 441.86 | 461.02 | **483.79** |
-| Arithmetic Intensity (FLOP/Byte) | 0.29 | 0.29 | 0.29 |
-| Updates/sec | 18,410,666,313.14 | — | — |
-| Latency (ms) | 0.23 | — | — |
-
-The supplied V5 results therefore show the highest reported speedup, GFLOPS, and bandwidth for the Halo implementation at the largest tested grid.
-
 # License
+
 MIT License
 
 ---
