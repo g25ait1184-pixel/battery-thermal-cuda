@@ -1,499 +1,459 @@
-# battery-thermal-cuda
+# GPU-Accelerated Physics-AI Thermal Digital Twin
 
-GPU-Accelerated Battery Thermal Propagation Simulator using CUDA with Global Memory, Shared Memory, and Halo Optimization.
+This repository contains the implementation and experimental artifacts associated with the paper:
 
----
+**"GPU-Accelerated Physics-AI Thermal Digital Twins: A Scalable Scientific Computing Framework"**
 
-## Overview
-
-`battery-thermal-cuda` is a CUDA-based framework for simulating heat propagation inside batteries using finite-difference stencil methods. The battery is represented as a two-dimensional thermal domain, where each computational cell stores the local temperature.
-
-The framework investigates different GPU memory optimization techniques and compares them against CPU execution. Dynamic heat sources are derived from the NASA battery dataset, enabling realistic time-varying thermal behavior.
-
-The project supports:
-
-* CPU thermal solver
-* Global Memory GPU kernel
-* Shared Memory tiled kernel
-* Halo-region optimized kernel
-* Constant and dynamic heat sources
-* NASA battery dataset integration
-* Performance benchmarking
-* GFLOPS and bandwidth analysis
-* Roofline analysis
-* Nsight Compute profiling
-* Thermal map generation
-
-The framework serves as a foundation for future:
-
-* Electro-thermal battery models
-* Battery Digital Twins
-* Multi-GPU halo exchange
-* SOC and SOH estimation
-* AI surrogate models
+The work presents an integrated framework combining high-fidelity electro-thermal physics modeling, Physics-AI residual learning, validity-aware model switching, and CUDA-accelerated scientific computing for battery thermal Digital Twins.
 
 ---
 
-# Physics Model
+## 1. Overview
 
-## Battery Heat Generation
+High-fidelity electro-thermal simulations can become computationally expensive when evaluated over large spatial grids and repeated operating conditions.
 
-Heat generation is modeled using Joule heating:
+This work addresses this challenge through a multi-fidelity Physics-AI framework that combines:
 
-```math
-Q = I^2R
-```
+- High-fidelity electro-thermal physics modeling
+- SOC/SOH-aware thermal modeling
+- Neural-network-based thermal prediction
+- Residual learning for prediction refinement
+- Validity-aware Physics-AI model switching
+- Physics-based fallback outside the validated AI domain
+- CUDA-accelerated thermal stencil computation
+- Shared-memory tiling
+- Halo-based data reuse
+- CUDA stream concurrency
+- CPU-GPU numerical consistency analysis
+- Roofline-based performance analysis
 
-where
-
-* (I) = Battery current (A)
-* (R) = Internal resistance (Ω)
-* (Q) = Generated heat (W)
-
-For dynamic simulations, current values are obtained from the NASA battery dataset:
-
-```math
-Q(t)=I(t)^2R
-```
-
----
-
-## Transient Heat Equation
-
-Heat diffusion inside the battery is governed by
-
-```math
-\frac{\partial T}{\partial t}
-=
-\alpha
-\left(
-\frac{\partial^2T}{\partial x^2}
-+
-\frac{\partial^2T}{\partial y^2}
-\right)
-+
-Q
-```
-
-where
-
-* (T) = Temperature
-* (\alpha) = Thermal diffusivity
-* (Q) = Heat source
-
-Using finite differences, the update equation becomes
-
-```math
-T_{i,j}^{n+1}
-=
-T_{i,j}^{n}
-+
-\alpha
-\left(
-T_{i-1,j}
-+
-T_{i+1,j}
-+
-T_{i,j-1}
-+
-T_{i,j+1}
--
-4T_{i,j}
-\right)
-+
-\beta Q
-```
+The physics model serves as the high-fidelity reference and fallback model, while the Physics-AI model provides a computationally efficient approximation within its validated operating region.
 
 ---
 
-# Battery Thermal Domain Representation
+## 2. Framework
 
-The battery is discretized into an (N \times N) thermal grid.
+The overall framework is:
 
 ```text
-        Battery Cross Section
-
-        ┌────────────────────┐
-        │                    │
-        │    Thermal Grid    │
-        │                    │
-        │      256×256       │
-        │                    │
-        └────────────────────┘
+                High-Fidelity
+              Physics Model
+                    |
+                    v
+        Physics-Generated Dataset
+                    |
+                    v
+              Base AI Model
+                    |
+                    v
+             Residual Learning
+                    |
+                    v
+             Physics-AI Model
+                    |
+                    v
+          Validity-Aware Switching
+              /             \
+             /               \
+            v                 v
+     Physics-AI Model    Physics Model
+     (Valid Region)      (Fallback)
 ```
 
-Each grid cell represents a small region of the battery.
-
-## Grid Resolution
-
-| Grid Size | Number of Cells |
-| --------- | --------------: |
-| 256×256   |          65,536 |
-| 512×512   |         262,144 |
-| 1024×1024 |       1,048,576 |
-| 2048×2048 |       4,194,304 |
-
-Larger grids provide finer thermal resolution and improved accuracy.
+The high-fidelity thermal solver is additionally accelerated using CUDA to reduce the computational cost of repeated physics evaluations.
 
 ---
 
-# Heat Stencil
+## 3. Physics Model
 
-Each grid point exchanges heat with four neighboring cells.
+The reference thermal model incorporates:
 
-```text
-        Top
-         ↑
-Left ← Center → Right
-         ↓
-      Bottom
-```
+- Current-dependent Joule heating
+- Temperature-dependent resistance
+- Entropy heat generation
+- SOC-dependent behavior
+- SOH-dependent behavior
 
----
-
-# GPU Mapping
-
-Each grid cell is mapped to one CUDA thread.
-
-```text
-1 Battery Region
-       ↓
-1 Grid Cell
-       ↓
-1 CUDA Thread
-       ↓
-Temperature Update
-```
-
-For a 2048×2048 grid:
-
-* Total cells = 4,194,304
-* Total CUDA threads ≈ 4.2 million
+The physics model is used to generate the reference thermal response for AI training and evaluation and remains available as the trusted fallback outside the validated AI operating region.
 
 ---
 
-# GPU Kernels
+## 4. Physics-AI Model
 
-## Global Memory GPU
+The base AI model predicts the maximum thermal response from four operating variables:
 
-Neighbor values are accessed directly from global memory.
+- SOC
+- SOH
+- Initial Temperature
+- Current
+
+### Base AI Architecture
 
 ```text
-Global Memory
-      ↓
-    Thread
-      ↓
-   Compute
+4 → 32 → 32 → 16 → 1
 ```
+
+### Residual AI Architecture
+
+```text
+4 → 16 → 16 → 8 → 1
+```
+
+The final Physics-AI prediction is formulated as:
+
+```text
+T_PAI = T_AI + g_phi(x)
+```
+
+where:
+
+- `T_AI` is the base AI prediction
+- `g_phi(x)` is the learned residual correction
+- `T_PAI` is the final Physics-AI prediction
+- `x` represents the operating conditions
+
+The residual network learns the remaining prediction error of the base AI model rather than learning the complete thermal response from the beginning.
 
 ---
 
-## Shared Memory GPU
+## 5. AI Dataset and Training Configuration
 
-Tiles are loaded into shared memory to reduce global memory accesses.
+The AI dataset is generated using the high-fidelity electro-thermal model.
 
-```text
-Global Memory
-      ↓
- Shared Tile
-      ↓
-   Threads
-      ↓
-   Compute
-```
+| Parameter | Configuration |
+|---|---|
+| Number of cases | 1,000 |
+| SOC | 0.20–1.00 |
+| SOH | 0.70–1.00 |
+| Current | 10–30 A |
+| Initial temperature | 15–45 °C |
+| Thermal grid | 256 × 256 |
+| Time steps | 100 |
+| Train/Test split | 80/20 |
+| Optimizer | Adam |
+| Learning rate | 0.001 |
+| Epochs | 1000 |
+| Primary seed | 42 |
 
----
-
-## Halo GPU
-
-Halo cells are loaded around each tile to maximize memory locality and bandwidth utilization.
-
-```text
-Global Memory
-       ↓
- Shared Tile + Halo
-       ↓
-      Threads
-       ↓
-      Compute
-```
+A multi-seed evaluation is also performed to assess robustness to training initialization.
 
 ---
 
-# Project Structure
+## 6. CUDA Thermal Solver
+
+The thermal solver is implemented using CUDA and evaluated progressively using:
+
+1. Global-memory stencil computation
+2. Shared-memory tiled execution
+3. Halo-based data reuse
+4. CUDA stream concurrency
+
+The spatial resolutions evaluated are:
 
 ```text
-battery-thermal-cuda
+256 × 256
+512 × 512
+1024 × 1024
+2048 × 2048
+```
+
+The CPU and CUDA implementations use consistent physical parameters, initial conditions, boundary conditions, thermal inputs, and time-stepping configurations.
+
+---
+
+## 7. Physics-AI Results
+
+The primary evaluation using seed 42 gives:
+
+| Model | RMSE (°C) | MAE (°C) | R² |
+|---|---:|---:|---:|
+| Base AI | 0.1750 | 0.1394 | 0.999625 |
+| Base AI + Residual | 0.1409 | 0.1081 | 0.999757 |
+
+The five-seed evaluation gives:
+
+| Model | RMSE (°C) |
+|---|---:|
+| Base AI | 0.1715 ± 0.0104 |
+| Base AI + Residual | 0.1246 ± 0.0113 |
+
+The results demonstrate the improvement obtained by residual learning over the base AI predictor.
+
+---
+
+## 8. CUDA Performance
+
+The CUDA implementation provides substantial acceleration over the CPU reference.
+
+At the largest evaluated spatial resolution:
+
+| Parameter | Result |
+|---|---:|
+| Grid size | 2048 × 2048 |
+| Halo runtime | 17.58 ms |
+| CPU-GPU speedup | 1238.8× |
+
+CPU-GPU numerical consistency is maintained with RMSE below:
+
+```text
+2 × 10⁻⁶ °C
+```
+
+for all evaluated grid sizes.
+
+---
+
+## 9. Roofline Analysis
+
+The thermal stencil has an arithmetic intensity of approximately:
+
+```text
+0.29 FLOP/byte
+```
+
+At 2048 × 2048, the measured performance is:
+
+| Implementation | GFLOPS | Bandwidth (GB/s) |
+|---|---:|---:|
+| Global Memory | 128.92 | 442.00 |
+| Tiled | 147.38 | 505.31 |
+| Halo | 166.69 | 571.49 |
+
+The roofline analysis is used to characterize the computational and memory behavior of the CUDA thermal solver.
+
+---
+
+## 10. CUDA Stream Concurrency
+
+Independent thermal workloads are evaluated using multiple CUDA streams.
+
+At 2048 × 2048:
+
+| Streams | Batch Time (ms) | Aggregate Speedup |
+|---:|---:|---:|
+| 1 | 39.8352 | 1.00× |
+| 2 | 62.7138 | 1.27× |
+| 4 | 121.3785 | 1.31× |
+| 8 | 165.6361 | 1.92× |
+
+The results demonstrate improved aggregate throughput with increasing stream concurrency for independent thermal workloads.
+
+---
+
+## 11. Validity-Aware Digital Twin
+
+The validated Physics-AI operating region is:
+
+| Parameter | Validated Range |
+|---|---|
+| SOC | 0.20–1.00 |
+| SOH | 0.70–1.00 |
+| Current | 10–30 A |
+| Temperature | 15–45 °C |
+
+Within this validated region, the Physics-AI model is used.
+
+When the operating state moves outside the validated AI region, the Digital Twin switches to the high-fidelity physics model.
+
+A 10-step trajectory demonstrates the switching mechanism:
+
+```text
+Steps 1–5 : Physics-AI
+Steps 6–10: Physics fallback
+
+Physics-AI utilization: 50%
+```
+
+This demonstrates state-dependent model selection while retaining the physics solver as a fallback outside the validated AI domain.
+
+---
+
+## 12. Repository Structure
+
+The main repository components include:
+
+```text
+battery-thermal-cuda/
 │
-├── include
-│   ├── config.h
-│   ├── benchmark.h
-│   ├── kernels.h
-│   ├── metrics.h
-│   ├── thermal_map.h
-│   ├── utils.h
-│   └── cuda_events.h
+├── dataset/
+│   └── V5 physics-generated dataset and related data
 │
-├── src
-│   ├── main.cu
-│   ├── config.cu
-│   ├── benchmark_cpu.cu
-│   ├── benchmark_gpu.cu
-│   ├── benchmark_tiled.cu
-│   ├── benchmark_halo.cu
-│   ├── metrics.cu
-│   ├── thermal_map.cu
-│   ├── utils.cu
-│   └── cuda_events.cu
+├── include/
+│   └── Thermal-model and CUDA header files
 │
-├── kernels
-│   ├── gpu_stencil.cu
-│   ├── tiled_stencil.cu
-│   └── halo_stencil.cu
+├── kernels/
+│   └── CUDA thermal stencil implementation
 │
-├── data
-│   └── battery_dataset.csv
+├── src/
+│   └── Thermal solver and Digital Twin source code
 │
-├── results
-│   ├── results.csv
-│   ├── center_temp.csv
-│   └── thermal_map.csv
+├── results/
+│   └── Experimental and benchmark results
 │
-├── plots
-│   ├── speedup.png
-│   ├── bandwidth.png
-│   ├── roofline.png
-│   └── thermal_map.png
+├── plots/
+│   └── Performance and experimental plots
 │
-├── README.md
-├── LICENSE
-└── .gitignore
+└── README.md
 ```
+
+The repository also contains supporting files for dataset generation, CUDA benchmarking, thermal simulation, Digital Twin evaluation, and experimental analysis.
 
 ---
 
-# Build
+## 13. Key Experimental Artifacts
 
-Compile:
+The repository contains artifacts associated with the reported experiments, including:
 
-```%%bash
-
-cd /content/project/project
-
-nvcc \
--Wno-deprecated-gpu-targets \
--DHEAT_MODE=DYNAMIC_Q_MODE \
--DEXEC_MODE=NORMAL_EXECUTION \
--Iinclude \
-src/*.cu \
-kernels/*.cu \
--o thermal
-```
-
----
-
-# Run
-
-```bash
-./thermal
-```
+- Physics-generated thermal data
+- V5 dataset generation components
+- CUDA thermal solver implementations
+- CPU reference implementation
+- Global-memory CUDA implementation
+- Shared-memory tiled implementation
+- Halo-based implementation
+- CUDA stream implementation
+- Thermal maps
+- AI model results
+- Residual Physics-AI results
+- CUDA performance results
+- Roofline analysis data
+- Digital Twin evaluation results
 
 ---
 
-# Nsight Compute Profiling
+## 14. Reproducibility
 
-Compile:
-
-```%%bash
-
-cd /content/project/project
-
-nvcc \
--Wno-deprecated-gpu-targets \
--DHEAT_MODE=DYNAMIC_Q_MODE \
--DEXEC_MODE=NSIGHT_EXECUTION \
--Iinclude \
-src/*.cu \
-kernels/*.cu \
--o thermal
-```
-
-Profile:
-
-```ncu \
---set full \
---launch-count 1 \
-./thermal
-```
-
-Metrics analyzed:
-
-* Occupancy
-* Warp efficiency
-* Memory throughput
-* L1 cache utilization
-* L2 cache utilization
-* Shared memory utilization
-
----
-
-# Performance Metrics
-
-The framework reports:
-
-* Runtime
-* Speedup
-* GFLOPS
-* Effective memory bandwidth
-
-Typical speedup:
-
-| Grid Size | GPU Speedup | Halo Speedup |
-| --------- | ----------: | -----------: |
-| 256×256   |        107× |          84× |
-| 512×512   |        160× |          97× |
-| 1024×1024 |        170× |         203× |
-| 2048×2048 |        202× |         227× |
-
----
-
-# Roofline Characteristics
-
-Arithmetic Intensity
+The primary AI experiments use:
 
 ```text
-AI ≈ 0.29 FLOP/Byte
+Random seed: 42
 ```
 
-The stencil kernel is primarily memory-bandwidth limited, making shared-memory and halo optimizations highly effective.
+Additional random seeds are used for multi-seed robustness evaluation.
 
-# Performance Results
+The CUDA experiments use consistent physical and numerical configurations between the CPU and GPU implementations to enable direct numerical and performance comparison.
 
-The framework reports runtime, speedup, computational throughput (GFLOPS), and effective memory bandwidth for CPU, Global GPU, Shared GPU, and Halo GPU implementations.
+### Requirements
 
-## Performance Comparison
+Reproduction requires:
 
-| Grid Size | CPU (ms) | GPU (ms) | Shared GPU (ms) | Halo GPU (ms) | GPU Speedup | Shared Speedup | Halo Speedup | GPU GFLOPS | Shared GFLOPS | Halo GFLOPS | GPU BW (GB/s) | Shared BW (GB/s) | Halo BW (GB/s) |
-| --------- | -------: | -------: | --------------: | ------------: | ----------: | -------------: | -----------: | ---------: | ------------: | ----------: | ------------: | ---------------: | -------------: |
-| 256×256   |    51.55 |     0.48 |            0.53 |          0.62 |     107.76× |         96.44× |       83.68× |      94.42 |         84.49 |       73.32 |        323.72 |           289.69 |         251.37 |
-| 512×512   |   236.54 |     1.48 |            1.87 |          2.43 |     160.28× |        126.34× |       97.47× |     123.37 |         97.25 |       75.02 |        422.98 |           333.41 |         257.21 |
-| 1024×1024 |   906.35 |     5.34 |            6.13 |          4.46 |     169.79× |        147.79× |      203.44× |     136.97 |        119.22 |      164.11 |        469.61 |           408.74 |         562.68 |
-| 2048×2048 |  3593.75 |    17.75 |           16.32 |         15.82 |     202.44× |        220.14× |      227.21× |     165.07 |        179.50 |      185.27 |        565.95 |           615.42 |         635.20 |
+- NVIDIA CUDA-capable GPU
+- CUDA Toolkit
+- C/C++ compiler with `nvcc`
+- Python 3.x
+- Required Python packages used by the AI and analysis scripts
 
----
-
-## Performance Observations
-
-### CPU vs GPU
-
-The CUDA implementation provides significant acceleration over the CPU implementation. For the largest problem size (2048×2048), the global GPU kernel achieves more than **202× speedup**.
-
-### Shared Memory Optimization
-
-Shared-memory tiling improves memory reuse and reduces global memory traffic. For larger grids, Shared GPU performance exceeds the global-memory implementation.
-
-### Halo Optimization
-
-The halo kernel achieves the best overall performance by maximizing memory locality and shared-memory utilization.
-
-At a grid size of **2048×2048**, the Halo GPU kernel achieves:
-
-* **227× speedup**
-* **185 GFLOPS**
-* **635 GB/s memory bandwidth**
-
-### Computational Throughput
-
-Peak computational performance:
-
-| Kernel     | Peak GFLOPS |
-| ---------- | ----------: |
-| Global GPU |      165.07 |
-| Shared GPU |      179.50 |
-| Halo GPU   |      185.27 |
-
-### Effective Memory Bandwidth
-
-Peak memory bandwidth:
-
-| Kernel     | Peak Bandwidth (GB/s) |
-| ---------- | --------------------: |
-| Global GPU |                565.95 |
-| Shared GPU |                615.42 |
-| Halo GPU   |                635.20 |
-
----
-## Nsight Compute Profiling (Halo Kernel)
-
-The Halo kernel was profiled using **NVIDIA Nsight Compute**. The profiling results indicate high occupancy, excellent warp execution efficiency, and effective cache utilization.
-
-| Metric                    |                       Halo |
-| ------------------------- | -------------------------: |
-| Runtime                   |                  337.89 μs |
-| Achieved Occupancy        |                     87.9 % |
-| DRAM Throughput           |               39.67 % Peak |
-| Memory Throughput         |               59.76 % Peak |
-| L2 Cache Hit Rate         |                     76.6 % |
-| Warp Execution Efficiency |                     99.9 % |
-| Registers / Thread        |                         20 |
-| Shared Memory / Block     |                     1.3 KB |
-| Dominant Stall Reason     | No Eligible Warps (74.48%) |
-
-The results show that the Halo kernel achieves high occupancy and near-perfect warp execution efficiency while benefiting from effective L2 cache reuse. The primary performance bottleneck is the lack of eligible warps available to hide latency, indicating that further improvements may be obtained through increased instruction-level parallelism or additional memory access overlap.
-
-## Summary
-
-The experimental results demonstrate that:
-
-* GPU acceleration provides over two orders of magnitude speedup compared to CPU execution.
-* Shared-memory tiling improves data locality and computational throughput.
-* Halo optimization delivers the highest GFLOPS and memory bandwidth.
-* Performance scales with increasing grid sizes, making the framework suitable for large-scale battery thermal simulations.
-* The developed framework provides a foundation for future multi-GPU battery digital twins and electro-thermal simulations.
+The exact execution commands depend on the corresponding source files and scripts included in the repository.
 
 ---
 
-# Future Work
+## 15. Dataset
 
-Temperature-dependent resistance:
+The thermal reference simulations use a high-fidelity SOC/SOH-aware electro-thermal model.
 
-```math
-R(T)=R_0(1+\alpha(T-T_0))
+A dynamic heat-generation profile containing 1,698 samples is used from the NASA Battery Data Set.
+
+The AI dataset consists of 1,000 operating cases generated from the physics model.
+
+The AI cases cover:
+
+| Parameter | Range |
+|---|---|
+| SOC | 0.20–1.00 |
+| SOH | 0.70–1.00 |
+| Current | 10–30 A |
+| Initial Temperature | 15–45 °C |
+
+---
+
+## 16. Performance Summary
+
+### AI Prediction
+
+```text
+Base AI RMSE:             0.1750 °C
+Base AI + Residual RMSE:  0.1409 °C
+
+Base AI MAE:              0.1394 °C
+Base AI + Residual MAE:   0.1081 °C
 ```
 
-Planned extensions:
+### Multi-Seed Evaluation
 
-* Electro-thermal coupling
-* SOC estimation
-* SOH estimation
-* Multi-GPU halo exchange
-* CUDA streams
-* NVLink optimization
-* Battery Digital Twin
-* AI surrogate models
-* Tensor Core acceleration
+```text
+Base AI:
+0.1715 ± 0.0104 °C
+
+Base AI + Residual:
+0.1246 ± 0.0113 °C
+```
+
+### CUDA Solver
+
+```text
+Largest grid:             2048 × 2048
+Halo runtime:             17.58 ms
+Maximum CPU-GPU speedup:  1238.8×
+Numerical RMSE:           < 2 × 10⁻⁶ °C
+```
+
+### CUDA Streams
+
+```text
+Maximum aggregate speedup:
+1.92× with 8 streams
+```
 
 ---
 
-# License
+## 17. Paper
 
-MIT License
+This repository accompanies the paper:
+
+**Vallinath S. and Binod Kumar,  
+"GPU-Accelerated Physics-AI Thermal Digital Twins: A Scalable Scientific Computing Framework,"  
+AI-SPC, 2026.**
+
+The repository provides the implementation and experimental artifacts supporting the reported:
+
+- Physics-AI prediction
+- Residual learning
+- CUDA acceleration
+- CPU-GPU numerical consistency
+- Roofline analysis
+- CUDA stream evaluation
+- Validity-aware Digital Twin model switching
 
 ---
 
-# Author
+## 18. Scope and Limitations
 
-**Vallinath S**
+The current implementation focuses on maximum-temperature prediction and validity-aware model switching.
 
-PGD-AI, IIT Jodhpur
+The current work does not yet provide:
 
-📧 [g25ait1184@iitj.ac.in](mailto:g25ait1184@iitj.ac.in)
+- Recursive next-state thermal prediction
+- Complete spatial thermal-field AI prediction
+- Realistic vehicle drive-cycle validation
+- Closed-loop long-duration Digital Twin validation
+- Actual BMS measurement integration
+- Multi-GPU validation
 
-### Areas of Interest
+These are considered directions for future work.
 
-* CUDA Programming
-* GPU Computing
-* Battery Management Systems
-* Embedded Systems
-* Battery Digital Twin
-* AI for Energy Storage Systems
+The proposed framework can also be extended to other thermal-management applications, including:
+
+- AI data-center cooling
+- High-performance computing thermal management
+- Liquid-based thermal management
+- Other large-scale thermal Digital Twins
+
+These applications are proposed as future extensions and are not directly validated by the current experiments.
+
+---
+
+## 19. License
+
+This repository is provided for research and academic use.
+
+Please refer to the repository license for the applicable terms.
