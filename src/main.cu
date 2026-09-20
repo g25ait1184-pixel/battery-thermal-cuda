@@ -17,15 +17,210 @@
 #include "validation_metrics.h"
 #include "stream_solver.h"
 #include "generate_v5_dataset.h"
-
+#include "../digital_twin/battery_thermal_twin.h"
 
 using namespace std;
 
-
+#define ENABLE_DIGITAL_TWIN_ONLY true
 //======================================================
 // MAIN
 //======================================================
+void runDigitalTwinTest(const Config& cfg)
+{
+    cout
+        << "\n=====================================\n"
+        << "DIGITAL TWIN TEST\n"
+        << "=====================================\n";
 
+    //--------------------------------------------------
+    // Twin configuration
+    //--------------------------------------------------
+
+    TwinConfig twinCfg{};
+
+    twinCfg.mode =
+        TWIN_PHYSICS;
+
+    twinCfg.enablePhysics =
+        true;
+
+    twinCfg.enableAI =
+        false;
+
+    twinCfg.enableResidual =
+        false;
+
+    twinCfg.enableValidation =
+        true;
+
+    twinCfg.gridSize =
+        256;
+
+    twinCfg.physicsSteps =
+        100;
+
+    //--------------------------------------------------
+    // Heat profile
+    //--------------------------------------------------
+
+    vector<float> heatProfile;
+
+    if(cfg.heatMode == DYNAMIC_Q)
+    {
+        heatProfile =
+            loadHeatProfile(
+                cfg.resistance
+            );
+    }
+    else
+    {
+        float Q =
+            cfg.current *
+            cfg.current *
+            cfg.resistance;
+
+        heatProfile.push_back(Q);
+    }
+
+    if(heatProfile.empty())
+    {
+        cout
+            << "Digital Twin: heat profile empty."
+            << endl;
+
+        return;
+    }
+
+    //--------------------------------------------------
+    // Initial twin input
+    //--------------------------------------------------
+
+    TwinInput input{};
+
+    input.current_A =
+        20.0f;
+
+    input.soc =
+        0.80f;
+
+    input.soh =
+        0.90f;
+
+    input.temperature_C =
+        30.0f;
+
+    input.dt_s =
+        1.0f;
+
+    //--------------------------------------------------
+    // Create twin
+    //--------------------------------------------------
+
+    BatteryThermalDigitalTwin twin(
+        twinCfg,
+        cfg
+    );
+
+    //--------------------------------------------------
+    // Initialize
+    //--------------------------------------------------
+
+    if(!twin.initialize(
+        input,
+        heatProfile))
+    {
+        cout
+            << "Digital Twin initialization failed."
+            << endl;
+
+        return;
+    }
+
+    //--------------------------------------------------
+    // Run one physics step
+    //--------------------------------------------------
+
+    if(!twin.stepPhysics())
+    {
+        cout
+            << "Digital Twin physics step failed."
+            << endl;
+
+        return;
+    }
+
+    //--------------------------------------------------
+    // Read state
+    //--------------------------------------------------
+
+    TwinState state =
+        twin.getState();
+
+    TwinOutput output =
+        twin.getOutput();
+
+    //--------------------------------------------------
+    // Print
+    //--------------------------------------------------
+
+    cout
+        << "\nDigital Twin State\n";
+
+    cout
+        << "SOC          : "
+        << state.soc
+        << endl;
+
+    cout
+        << "SOH          : "
+        << state.soh
+        << endl;
+
+    cout
+        << "Current      : "
+        << state.current_A
+        << " A"
+        << endl;
+
+    cout
+        << "Tmin         : "
+        << state.tMin_C
+        << " C"
+        << endl;
+
+    cout
+        << "Tmax         : "
+        << state.tMax_C
+        << " C"
+        << endl;
+
+    cout
+        << "Tmean        : "
+        << state.tMean_C
+        << " C"
+        << endl;
+
+    cout
+        << "Tcenter      : "
+        << state.tCenter_C
+        << " C"
+        << endl;
+
+    cout
+        << "Thermal Range: "
+        << state.thermalRange_C
+        << " C"
+        << endl;
+
+    cout
+        << "Runtime      : "
+        << output.inferenceTime_ms
+        << " ms"
+        << endl;
+
+    cout
+        << "=====================================\n";
+}
 int main()
 {
     //--------------------------------------------------
@@ -33,6 +228,12 @@ int main()
     //--------------------------------------------------
 
     Config cfg = initConfig();
+
+    if(ENABLE_DIGITAL_TWIN_ONLY)
+{
+    runDigitalTwinTest(cfg);
+    return 0;
+}
 
     //==================================================
     // V5 DATASET GENERATION
