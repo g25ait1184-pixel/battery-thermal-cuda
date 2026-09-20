@@ -15,6 +15,7 @@
 #include "cuda_events.h"
 #include "battery_model.h"
 #include "validation_metrics.h"
+<<<<<<< HEAD
 
 using namespace std;
 
@@ -28,9 +29,58 @@ int main()
     //--------------------------------------------------
     // Configuration
     //--------------------------------------------------
+=======
+#include "stream_solver.h"
+#include "generate_v5_dataset.h"
+#include "../digital_twin/battery_thermal_twin.h"
 
-    Config cfg = initConfig();
+using namespace std;
 
+#define ENABLE_DIGITAL_TWIN_ONLY true
+//======================================================
+// MAIN
+//======================================================
+void runDigitalTwinTest(const Config& cfg)
+{
+    cout
+        << "\n=====================================\n"
+        << "DIGITAL TWIN TEST\n"
+        << "=====================================\n";
+>>>>>>> development
+
+    //--------------------------------------------------
+    // Twin configuration
+    //--------------------------------------------------
+
+<<<<<<< HEAD
+=======
+    TwinConfig twinCfg{};
+
+    twinCfg.mode =
+        TWIN_PHYSICS;
+
+    twinCfg.enablePhysics =
+        true;
+
+    twinCfg.enableAI =
+        false;
+
+    twinCfg.enableResidual =
+        false;
+
+    twinCfg.enableValidation =
+        true;
+
+    twinCfg.gridSize =
+        256;
+
+    twinCfg.physicsSteps =
+        100;
+
+    //--------------------------------------------------
+    // Heat profile
+    //--------------------------------------------------
+>>>>>>> development
 
     //--------------------------------------------------
     // Battery Models
@@ -44,6 +94,7 @@ int main()
 
     BatteryModelVersion models[] =
     {
+<<<<<<< HEAD
         MODEL_V1,
         MODEL_V2,
         MODEL_V3,
@@ -245,6 +296,400 @@ int main()
 
 
         //--------------------------------------------------
+=======
+        heatProfile =
+            loadHeatProfile(
+                cfg.resistance
+            );
+    }
+    else
+    {
+        float Q =
+            cfg.current *
+            cfg.current *
+            cfg.resistance;
+
+        heatProfile.push_back(Q);
+    }
+
+    if(heatProfile.empty())
+    {
+        cout
+            << "Digital Twin: heat profile empty."
+            << endl;
+
+        return;
+    }
+
+    //--------------------------------------------------
+    // Initial twin input
+    //--------------------------------------------------
+
+    TwinInput input{};
+
+    input.current_A =
+        20.0f;
+
+    input.soc =
+        0.80f;
+
+    input.soh =
+        0.90f;
+
+    input.temperature_C =
+        30.0f;
+
+    input.dt_s =
+        1.0f;
+
+    //--------------------------------------------------
+    // Create twin
+    //--------------------------------------------------
+
+    BatteryThermalDigitalTwin twin(
+        twinCfg,
+        cfg
+    );
+
+    //--------------------------------------------------
+    // Initialize
+    //--------------------------------------------------
+
+    if(!twin.initialize(
+        input,
+        heatProfile))
+    {
+        cout
+            << "Digital Twin initialization failed."
+            << endl;
+
+        return;
+    }
+
+    //--------------------------------------------------
+    // Run one physics step
+    //--------------------------------------------------
+
+    if(!twin.stepPhysics())
+    {
+        cout
+            << "Digital Twin physics step failed."
+            << endl;
+
+        return;
+    }
+
+    //--------------------------------------------------
+    // Read state
+    //--------------------------------------------------
+
+    TwinState state =
+        twin.getState();
+
+    TwinOutput output =
+        twin.getOutput();
+
+    //--------------------------------------------------
+    // Print
+    //--------------------------------------------------
+
+    cout
+        << "\nDigital Twin State\n";
+
+    cout
+        << "SOC          : "
+        << state.soc
+        << endl;
+
+    cout
+        << "SOH          : "
+        << state.soh
+        << endl;
+
+    cout
+        << "Current      : "
+        << state.current_A
+        << " A"
+        << endl;
+
+    cout
+        << "Tmin         : "
+        << state.tMin_C
+        << " C"
+        << endl;
+
+    cout
+        << "Tmax         : "
+        << state.tMax_C
+        << " C"
+        << endl;
+
+    cout
+        << "Tmean        : "
+        << state.tMean_C
+        << " C"
+        << endl;
+
+    cout
+        << "Tcenter      : "
+        << state.tCenter_C
+        << " C"
+        << endl;
+
+    cout
+        << "Thermal Range: "
+        << state.thermalRange_C
+        << " C"
+        << endl;
+
+    cout
+        << "Runtime      : "
+        << output.inferenceTime_ms
+        << " ms"
+        << endl;
+
+    cout
+        << "=====================================\n";
+}
+int main()
+{
+    //--------------------------------------------------
+    // Configuration
+    //--------------------------------------------------
+
+    Config cfg = initConfig();
+
+    if(ENABLE_DIGITAL_TWIN_ONLY)
+{
+    runDigitalTwinTest(cfg);
+    return 0;
+}
+
+    //==================================================
+    // V5 DATASET GENERATION
+    //==================================================
+    // Keep disabled while validating the corrected V5
+    // physics, numerical accuracy, CUDA Streams, and
+    // Nsight results. Enable only after the baseline
+    // is frozen.
+    constexpr bool ENABLE_V5_DATASET_GENERATION = true;
+
+
+    //--------------------------------------------------
+    // NSIGHT / CUDA STREAMS EXPERIMENT SETTINGS
+    //--------------------------------------------------
+    // Use a fixed, reproducible workload for the stream
+    // scaling experiment. Only MODEL_V5 is profiled.
+    //--------------------------------------------------
+
+    if(cfg.execMode == NSIGHT_MODE)
+    {
+        cfg.RUNS = 1;
+        cfg.steps = 100;
+
+        cfg.sizes.clear();
+        cfg.sizes.push_back(2048);
+
+        cfg.saveCSV = false;
+        cfg.savePlots = false;
+    }
+
+
+    //--------------------------------------------------
+    // Battery Models
+    //--------------------------------------------------
+
+    BatteryModelVersion models[] =
+    {
+        MODEL_V1,
+        MODEL_V2,
+        MODEL_V3,
+        MODEL_V4,
+        MODEL_V5
+    };
+
+    const char* modelNames[] =
+    {
+        "MODEL_V1",
+        "MODEL_V2",
+        "MODEL_V3",
+        "MODEL_V4",
+        "MODEL_V5"
+    };
+
+    const int NUM_MODELS = 5;
+
+
+    //--------------------------------------------------
+    // Print V5 parameters
+    //--------------------------------------------------
+
+    cout << "\n=====================================\n";
+    cout << "Battery Electro-Thermal Simulation";
+    cout << "\n=====================================\n";
+
+    cout << "\nInitial SOC = "
+         << cfg.initialSOC
+         << endl;
+
+    cout << "Initial SOH = "
+         << cfg.initialSOH
+         << endl;
+
+    cout << "SOC Resistance Coeff = "
+         << cfg.socResistanceCoeff
+         << endl;
+
+    cout << "SOH Resistance Coeff = "
+         << cfg.sohResistanceCoeff
+         << endl;
+
+    cout << "SOC Heat Coeff = "
+         << cfg.socHeatCoeff
+         << endl;
+
+    cout << "SOH Heat Coeff = "
+         << cfg.sohHeatCoeff
+         << endl;
+
+
+    //--------------------------------------------------
+    // Run V1 -> V5
+    //--------------------------------------------------
+
+    for(int modelIndex = 0;
+        modelIndex < NUM_MODELS;
+        modelIndex++)
+    {
+        //--------------------------------------------------
+        // Set current battery model
+        //--------------------------------------------------
+
+        cfg.modelVersion =
+            models[modelIndex];
+
+        cout
+            << "\n=====================================\n";
+
+        cout
+            << "Running "
+            << modelNames[modelIndex]
+            << endl;
+
+        cout
+            << "=====================================\n";
+
+
+        //--------------------------------------------------
+        // Model description
+        //--------------------------------------------------
+
+        switch(cfg.modelVersion)
+        {
+            case MODEL_V1:
+
+                cout
+                    << "NASA heat only"
+                    << endl;
+
+                break;
+
+            case MODEL_V2:
+
+                cout
+                    << "NASA heat + Joule heating"
+                    << endl;
+
+                break;
+
+            case MODEL_V3:
+
+                cout
+                    << "NASA heat + temperature-dependent resistance"
+                    << endl;
+
+                break;
+
+            case MODEL_V4:
+
+                cout
+                    << "NASA heat + temperature-dependent resistance"
+                    << " + entropy heat"
+                    << endl;
+
+                break;
+
+            case MODEL_V5:
+
+                cout
+                    << "SOC/SOH-aware electro-thermal model"
+                    << endl;
+
+                break;
+
+            default:
+
+                cout
+                    << "Unknown model"
+                    << endl;
+
+                break;
+        }
+
+
+        //--------------------------------------------------
+        // Load Heat Profile
+        //--------------------------------------------------
+
+        vector<float> heatProfile;
+
+        if(cfg.heatMode == DYNAMIC_Q)
+        {
+            heatProfile =
+                loadHeatProfile(
+                    cfg.resistance
+                );
+
+            if(heatProfile.empty())
+            {
+                cout
+                    << "Failed to load heat profile!"
+                    << endl;
+
+                return -1;
+            }
+
+            cout
+                << "\nHeat Mode : DYNAMIC Q"
+                << endl;
+
+            cout
+                << "Heat Profile Size = "
+                << heatProfile.size()
+                << endl;
+        }
+        else
+        {
+            float Q =
+                cfg.current *
+                cfg.current *
+                cfg.resistance;
+
+            heatProfile.push_back(Q);
+
+            cout
+                << "\nHeat Mode : CONSTANT Q"
+                << endl;
+
+            cout
+                << "Heat Source Q = "
+                << Q
+                << endl;
+        }
+
+
+        //--------------------------------------------------
+>>>>>>> development
         // Execution Mode
         //--------------------------------------------------
 
@@ -257,7 +702,11 @@ int main()
         else if(cfg.execMode == NSIGHT_MODE)
         {
             cout
+<<<<<<< HEAD
                 << "Execution Mode : NSIGHT"
+=======
+                << "Execution Mode : NSIGHT / CUDA STREAMS"
+>>>>>>> development
                 << endl;
         }
         else
@@ -303,19 +752,42 @@ int main()
 
 
         //--------------------------------------------------
+<<<<<<< HEAD
         // CPU vs GPU Validation Results
+=======
+        // CPU vs GPU Validation
+>>>>>>> development
         //--------------------------------------------------
 
         vector<ValidationMetrics>
             validationResults;
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> development
         vector<string>
             validationModelNames;
 
 
         //--------------------------------------------------
+<<<<<<< HEAD
         // Header
+=======
+        // CUDA Streams Results
+        //--------------------------------------------------
+
+        vector<int> streamGridSizes;
+
+        vector<double> stream1Results;
+        vector<double> stream2Results;
+        vector<double> stream4Results;
+        vector<double> stream8Results;
+
+
+        //--------------------------------------------------
+        // Normal-mode CSV header
+>>>>>>> development
         //--------------------------------------------------
 
         if(cfg.execMode == NORMAL_MODE)
@@ -354,7 +826,10 @@ int main()
             //--------------------------------------------------
 
             vector<float> T;
+<<<<<<< HEAD
 
+=======
+>>>>>>> development
             vector<float> Tnew;
 
             initializeGrid(
@@ -379,6 +854,7 @@ int main()
             // Runtime variables
             //--------------------------------------------------
 
+<<<<<<< HEAD
             double cpu_ms =
                 0.0;
 
@@ -390,12 +866,19 @@ int main()
 
             double halo_ms =
                 0.0;
+=======
+            double cpu_ms = 0.0;
+            double gpu_ms = 0.0;
+            double tiled_ms = 0.0;
+            double halo_ms = 0.0;
+>>>>>>> development
 
 
             //--------------------------------------------------
             // Final temperature fields
             //--------------------------------------------------
 
+<<<<<<< HEAD
             vector<float>
                 finalT_CPU;
 
@@ -407,6 +890,13 @@ int main()
 
             vector<float>
                 finalT_Halo;
+=======
+            vector<float> finalT_CPU;
+            vector<float> finalT_GPU;
+            vector<float> finalT_Tiled;
+            vector<float> finalT_Halo;
+            vector<float> finalT_Streams;
+>>>>>>> development
 
 
             //==================================================
@@ -476,10 +966,28 @@ int main()
             //==================================================
             // NSIGHT MODE
             //==================================================
+<<<<<<< HEAD
+=======
+            //
+            // Dedicated CUDA Streams profiling mode.
+            //
+            // Only MODEL_V5 is profiled here.
+            //
+            // Stream counts:
+            //     1
+            //     2
+            //     4
+            //     8
+            //
+            // This keeps the Nsight timeline clean.
+            //
+            //==================================================
+>>>>>>> development
 
             else if(cfg.execMode == NSIGHT_MODE)
             {
                 //--------------------------------------------------
+<<<<<<< HEAD
                 // GPU
                 //--------------------------------------------------
 
@@ -519,6 +1027,296 @@ int main()
                         heatProfile,
                         finalT_Halo
                     );
+=======
+                // Only run CUDA Streams for V5
+                //--------------------------------------------------
+                if(cfg.modelVersion == MODEL_V5)
+                {
+                    cout
+                        << "\n"
+                        << "-------------------------------------\n";
+
+                    cout
+                        << "CUDA Streams Nsight Experiment"
+                        << endl;
+
+                    cout
+                        << "Model : MODEL_V5"
+                        << endl;
+
+                    cout
+                        << "Grid  : "
+                        << N
+                        << " x "
+                        << N
+                        << endl;
+
+                    cout
+                        << "Steps : "
+                        << cfg.steps
+                        << endl;
+
+                    cout
+                        << "-------------------------------------\n";
+
+
+                    //--------------------------------------------------
+                    // Battery Parameters
+                    //--------------------------------------------------
+
+                    BatteryParameters streamParams;
+
+                    streamParams.modelVersion =
+                        cfg.modelVersion;
+
+                    streamParams.current =
+                        cfg.current;
+
+                    streamParams.baseResistance =
+                        cfg.resistance;
+
+                    streamParams.referenceTemperature =
+                        cfg.referenceTemperature;
+
+                    streamParams.resistanceCoeff =
+                        cfg.resistanceCoeff;
+
+                    streamParams.diffusivityCoeff =
+                        cfg.diffusivityCoeff;
+
+                    streamParams.entropyCoeff =
+                        cfg.entropyCoeff;
+
+
+                    //--------------------------------------------------
+                    // V5 SOC / SOH
+                    //--------------------------------------------------
+
+                    streamParams.soc =
+                        cfg.initialSOC;
+
+                    streamParams.soh =
+                        cfg.initialSOH;
+
+
+                    streamParams.socResistanceCoeff =
+                        cfg.socResistanceCoeff;
+
+                    streamParams.sohResistanceCoeff =
+                        cfg.sohResistanceCoeff;
+
+                    streamParams.socHeatCoeff =
+                        cfg.socHeatCoeff;
+
+                    streamParams.sohHeatCoeff =
+                        cfg.sohHeatCoeff;
+
+
+                    //--------------------------------------------------
+                    // Stream counts
+                    //--------------------------------------------------
+
+                    const int streamCounts[] =
+                    {
+                        1,
+                        2,
+                        4,
+                        8
+                    };
+
+
+                    double streamTimes[4] =
+                    {
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    };
+
+
+                    //--------------------------------------------------
+                    // Run stream experiments
+                    //--------------------------------------------------
+
+                    for(int si = 0;
+                        si < 4;
+                        si++)
+                    {
+                        int numStreams =
+                            streamCounts[si];
+
+                        double totalStreamTime =
+                            0.0;
+
+
+                        //--------------------------------------------------
+                        // Benchmark repetitions
+                        //
+                        // In NSIGHT mode cfg.RUNS is normally 1.
+                        //--------------------------------------------------
+
+                        for(int r = 0;
+                            r < cfg.RUNS;
+                            r++)
+                        {
+                            vector<float>
+                                streamFinalT;
+
+
+                            double elapsed =
+                                runCUDAStreams(
+                                    numStreams,
+                                    N,
+                                    cfg.alpha,
+                                    cfg.steps,
+                                    cfg.beta,
+                                    streamParams,
+                                    T,
+                                    heatProfile,
+                                    streamFinalT
+                                );
+
+
+                            totalStreamTime +=
+                                elapsed;
+
+
+                            if(r == cfg.RUNS - 1)
+                            {
+                                finalT_Streams =
+                                    streamFinalT;
+                            }
+                        }
+
+
+                        //--------------------------------------------------
+                        // Average
+                        //--------------------------------------------------
+
+                        if(cfg.RUNS > 0)
+                        {
+                            streamTimes[si] =
+                                totalStreamTime /
+                                static_cast<double>(
+                                    cfg.RUNS
+                                );
+                        }
+
+
+                        //--------------------------------------------------
+                        // Print result
+                        //--------------------------------------------------
+
+                        cout
+                            << fixed
+                            << setprecision(4)
+                            << numStreams
+                            << " Stream(s) : "
+                            << streamTimes[si]
+                            << " ms"
+                            << endl;
+                    }
+
+
+                    //--------------------------------------------------
+                    // Stream scaling
+                    //--------------------------------------------------
+
+                    double baseline =
+                        streamTimes[0];
+
+
+                    cout
+                        << "\nCUDA Stream Scaling"
+                        << endl;
+
+                    cout
+                        << "-------------------------------------\n";
+
+
+                    for(int si = 0;
+                        si < 4;
+                        si++)
+                    {
+                        double speedup =
+                            0.0;
+
+                        double efficiency =
+                            0.0;
+
+
+                        if(streamTimes[si] > 0.0 &&
+                           baseline > 0.0)
+                        {
+                            speedup =
+                                baseline /
+                                streamTimes[si];
+
+                            efficiency =
+                                speedup /
+                                static_cast<double>(
+                                    streamCounts[si]
+                                ) *
+                                100.0;
+                        }
+
+
+                        cout
+                            << streamCounts[si]
+                            << " Stream(s)"
+                            << " | Time = "
+                            << streamTimes[si]
+                            << " ms"
+                            << " | Speedup = "
+                            << speedup
+                            << "x"
+                            << " | Efficiency = "
+                            << efficiency
+                            << "%"
+                            << endl;
+                    }
+
+
+                    cout
+                        << "-------------------------------------\n";
+
+
+                    //--------------------------------------------------
+                    // Store results
+                    //--------------------------------------------------
+
+                    streamGridSizes.push_back(
+                        N
+                    );
+
+                    stream1Results.push_back(
+                        streamTimes[0]
+                    );
+
+                    stream2Results.push_back(
+                        streamTimes[1]
+                    );
+
+                    stream4Results.push_back(
+                        streamTimes[2]
+                    );
+
+                    stream8Results.push_back(
+                        streamTimes[3]
+                    );
+                }
+                else
+                {
+                    //--------------------------------------------------
+                    // Do not profile V1-V4 in NSIGHT stream mode
+                    //--------------------------------------------------
+
+                    cout
+                        << "NSIGHT stream experiment skipped for "
+                        << modelNames[modelIndex]
+                        << endl;
+                }
+>>>>>>> development
             }
 
 
@@ -633,10 +1431,13 @@ int main()
                 // THERMAL METRICS
                 //==================================================
 
+<<<<<<< HEAD
                 //--------------------------------------------------
                 // CPU
                 //--------------------------------------------------
 
+=======
+>>>>>>> development
                 if(!finalT_CPU.empty())
                 {
                     ThermalMetrics cpuThermal =
@@ -651,10 +1452,13 @@ int main()
                 }
 
 
+<<<<<<< HEAD
                 //--------------------------------------------------
                 // GPU
                 //--------------------------------------------------
 
+=======
+>>>>>>> development
                 if(!finalT_GPU.empty())
                 {
                     ThermalMetrics gpuThermal =
@@ -669,10 +1473,13 @@ int main()
                 }
 
 
+<<<<<<< HEAD
                 //--------------------------------------------------
                 // Tiled
                 //--------------------------------------------------
 
+=======
+>>>>>>> development
                 if(!finalT_Tiled.empty())
                 {
                     ThermalMetrics tiledThermal =
@@ -687,10 +1494,13 @@ int main()
                 }
 
 
+<<<<<<< HEAD
                 //--------------------------------------------------
                 // Halo
                 //--------------------------------------------------
 
+=======
+>>>>>>> development
                 if(!finalT_Halo.empty())
                 {
                     ThermalMetrics haloThermal =
@@ -723,9 +1533,16 @@ int main()
                         validation
                     );
 
+<<<<<<< HEAD
 
                     validationModelNames.push_back(
                         string(modelNames[modelIndex])
+=======
+                    validationModelNames.push_back(
+                        string(
+                            modelNames[modelIndex]
+                        )
+>>>>>>> development
                     );
 
 
@@ -791,10 +1608,13 @@ int main()
 
         if(cfg.saveCSV)
         {
+<<<<<<< HEAD
             //--------------------------------------------------
             // CPU
             //--------------------------------------------------
 
+=======
+>>>>>>> development
             if(!cpuThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -806,10 +1626,13 @@ int main()
             }
 
 
+<<<<<<< HEAD
             //--------------------------------------------------
             // GPU
             //--------------------------------------------------
 
+=======
+>>>>>>> development
             if(!gpuThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -821,10 +1644,13 @@ int main()
             }
 
 
+<<<<<<< HEAD
             //--------------------------------------------------
             // Tiled
             //--------------------------------------------------
 
+=======
+>>>>>>> development
             if(!tiledThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -836,10 +1662,13 @@ int main()
             }
 
 
+<<<<<<< HEAD
             //--------------------------------------------------
             // Halo
             //--------------------------------------------------
 
+=======
+>>>>>>> development
             if(!haloThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -871,6 +1700,66 @@ int main()
                     validationResults
                 );
             }
+<<<<<<< HEAD
+=======
+
+
+            //==================================================
+            // CUDA STREAMS CSV
+            //==================================================
+
+            if(cfg.modelVersion == MODEL_V5 &&
+               !streamGridSizes.empty())
+            {
+                string streamFilename =
+                    string(RESULT_DIR) +
+                    "cuda_streams_MODEL_V5.csv";
+
+
+                ofstream streamFile(
+                    streamFilename
+                );
+
+
+                if(streamFile.is_open())
+                {
+                    streamFile
+                        << "Grid,"
+                        << "Streams_1,"
+                        << "Streams_2,"
+                        << "Streams_4,"
+                        << "Streams_8"
+                        << "\n";
+
+
+                    for(size_t i = 0;
+                        i < streamGridSizes.size();
+                        i++)
+                    {
+                        streamFile
+                            << streamGridSizes[i]
+                            << ","
+                            << stream1Results[i]
+                            << ","
+                            << stream2Results[i]
+                            << ","
+                            << stream4Results[i]
+                            << ","
+                            << stream8Results[i]
+                            << "\n";
+                    }
+
+
+                    streamFile.close();
+
+
+                    cout
+                        << "\nCUDA Streams results saved to: "
+                        << streamFilename
+                        << endl;
+                }
+            }
+>>>>>>> development
         }
 
 
@@ -888,6 +1777,43 @@ int main()
 
 
         //======================================================
+<<<<<<< HEAD
+=======
+        // V5 DATASET GENERATION
+        //======================================================
+        //
+        // Uses the SAME heat profile and Config already used
+        // by the validated V5 simulation. The generator calls
+        // the existing runGPU() path and therefore uses the
+        // corrected gpuStencil() / V5 physics.
+        //
+        // Disabled by default so normal, Streams, and Nsight
+        // validation runs are not affected.
+        //
+        //======================================================
+
+        if(cfg.modelVersion == MODEL_V5 &&
+           cfg.execMode == NORMAL_MODE &&
+           ENABLE_V5_DATASET_GENERATION)
+        {
+            cout
+                << "\n=====================================\n"
+                << "Starting V5 Dataset Generation"
+                << "\n=====================================\n";
+
+            generateV5Dataset(
+                cfg,
+                heatProfile
+            );
+
+            cout
+                << "\nV5 Dataset Generation Completed"
+                << endl;
+        }
+
+
+        //======================================================
+>>>>>>> development
         // CLEANUP
         //======================================================
 
@@ -917,6 +1843,13 @@ int main()
         << endl;
 
     cout
+<<<<<<< HEAD
+=======
+        << "V5 CUDA Streams Benchmark Completed"
+        << endl;
+
+    cout
+>>>>>>> development
         << "=====================================\n";
 
 

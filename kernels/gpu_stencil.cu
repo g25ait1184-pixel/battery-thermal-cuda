@@ -6,9 +6,15 @@
 using namespace std;
 
 
+<<<<<<< HEAD
 //------------------------------------------------------
 // GPU Thermal Solver
 //------------------------------------------------------
+=======
+//======================================================
+// GPU Thermal Solver
+//======================================================
+>>>>>>> development
 
 __global__
 void gpuStencil(
@@ -96,6 +102,7 @@ void gpuStencil(
 
 
         //------------------------------------------------
+<<<<<<< HEAD
         // Temperature-dependent resistance
         //------------------------------------------------
 
@@ -106,6 +113,51 @@ void gpuStencil(
                 referenceTemperature,
                 resistanceCoeff
             );
+=======
+        // Resistance
+        //
+        // V1-V4:
+        //     R = R(T)
+        //
+        // V5:
+        //     R = R(T)
+        //         * [1 + kSOC(1-SOC)]
+        //         * [1 + kSOH(1-SOH)]
+        //
+        // IMPORTANT:
+        // SOC/SOH resistance correction is applied
+        // ONLY here.
+        //------------------------------------------------
+
+        float resistance;
+
+        if(modelVersion == MODEL_V5)
+        {
+            resistance =
+                computeV5Resistance(
+                    baseResistance,
+                    center,
+                    referenceTemperature,
+                    resistanceCoeff,
+
+                    soc,
+                    soh,
+
+                    socResistanceCoeff,
+                    sohResistanceCoeff
+                );
+        }
+        else
+        {
+            resistance =
+                computeResistance(
+                    baseResistance,
+                    center,
+                    referenceTemperature,
+                    resistanceCoeff
+                );
+        }
+>>>>>>> development
 
 
         //------------------------------------------------
