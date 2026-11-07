@@ -15,28 +15,13 @@
 #include "cuda_events.h"
 #include "battery_model.h"
 #include "validation_metrics.h"
-<<<<<<< HEAD
-
-using namespace std;
-
-
-//======================================================
-// MAIN
-//======================================================
-
-int main()
-{
-    //--------------------------------------------------
-    // Configuration
-    //--------------------------------------------------
-=======
 #include "stream_solver.h"
 #include "generate_v5_dataset.h"
-#include "../digital_twin/battery_thermal_twin.h"
+#include "battery_thermal_twin.h"
 
 using namespace std;
 
-#define ENABLE_DIGITAL_TWIN_ONLY true
+#define ENABLE_DIGITAL_TWIN_ONLY false
 //======================================================
 // MAIN
 //======================================================
@@ -46,14 +31,11 @@ void runDigitalTwinTest(const Config& cfg)
         << "\n=====================================\n"
         << "DIGITAL TWIN TEST\n"
         << "=====================================\n";
->>>>>>> development
 
     //--------------------------------------------------
     // Twin configuration
     //--------------------------------------------------
 
-<<<<<<< HEAD
-=======
     TwinConfig twinCfg{};
 
     twinCfg.mode =
@@ -80,244 +62,18 @@ void runDigitalTwinTest(const Config& cfg)
     //--------------------------------------------------
     // Heat profile
     //--------------------------------------------------
->>>>>>> development
 
-    //--------------------------------------------------
-    // Battery Models
-    //
-    // V1 : NASA heat
-    // V2 : NASA + Joule heating
-    // V3 : Temperature-dependent resistance
-    // V4 : Temperature-dependent resistance + entropy
-    // V5 : SOC/SOH-aware electro-thermal model
-    //--------------------------------------------------
+    vector<float> heatProfile;
 
-    BatteryModelVersion models[] =
-    {
-<<<<<<< HEAD
-        MODEL_V1,
-        MODEL_V2,
-        MODEL_V3,
-        MODEL_V4,
-        MODEL_V5
-    };
-
-
-    const char* modelNames[] =
-    {
-        "MODEL_V1",
-        "MODEL_V2",
-        "MODEL_V3",
-        "MODEL_V4",
-        "MODEL_V5"
-    };
-
-
-    const int NUM_MODELS = 5;
-
-
-    //--------------------------------------------------
-    // Print V5 parameters
-    //--------------------------------------------------
-
-    cout << "\n=====================================\n";
-    cout << "Battery Electro-Thermal Simulation";
-    cout << "\n=====================================\n";
-
-    cout << "\nSOC = "
-         << cfg.soc
-         << endl;
-
-    cout << "SOH = "
-         << cfg.soh
-         << endl;
-
-    cout << "SOC Resistance Coeff = "
-         << cfg.socResistanceCoeff
-         << endl;
-
-    cout << "SOH Resistance Coeff = "
-         << cfg.sohResistanceCoeff
-         << endl;
-
-    cout << "SOC Heat Coeff = "
-         << cfg.socHeatCoeff
-         << endl;
-
-    cout << "SOH Heat Coeff = "
-         << cfg.sohHeatCoeff
-         << endl;
-
-
-    //--------------------------------------------------
-    // Run V1 -> V5
-    //--------------------------------------------------
-
-    for(int modelIndex = 0;
-        modelIndex < NUM_MODELS;
-        modelIndex++)
-    {
-        //--------------------------------------------------
-        // Set current battery model
-        //--------------------------------------------------
-
-        cfg.modelVersion =
-            models[modelIndex];
-
-
-        cout
-            << "\n=====================================\n";
-
-        cout
-            << "Running "
-            << modelNames[modelIndex]
-            << endl;
-
-        cout
-            << "=====================================\n";
-
-
-        //--------------------------------------------------
-        // Print model description
-        //--------------------------------------------------
-
-        switch(cfg.modelVersion)
-        {
-            case MODEL_V1:
-
-                cout
-                    << "NASA heat only"
-                    << endl;
-
-                break;
-
-
-            case MODEL_V2:
-
-                cout
-                    << "NASA heat + Joule heating"
-                    << endl;
-
-                break;
-
-
-            case MODEL_V3:
-
-                cout
-                    << "NASA heat + temperature-dependent resistance"
-                    << endl;
-
-                break;
-
-
-            case MODEL_V4:
-
-                cout
-                    << "NASA heat + temperature-dependent resistance"
-                    << " + entropy heat"
-                    << endl;
-
-                break;
-
-
-            case MODEL_V5:
-
-                cout
-                    << "SOC/SOH-aware electro-thermal model"
-                    << endl;
-
-                break;
-
-
-            default:
-
-                cout
-                    << "Unknown model"
-                    << endl;
-
-                break;
-        }
-
-
-        //--------------------------------------------------
-        // Load Heat Profile
-        //--------------------------------------------------
-
-        vector<float> heatProfile;
-
-
-        if(cfg.heatMode == DYNAMIC_Q)
-        {
-            heatProfile =
-                loadHeatProfile(
-                    cfg.resistance
-                );
-
-
-            if(heatProfile.empty())
-            {
-                cout
-                    << "Failed to load heat profile!"
-                    << endl;
-
-                return -1;
-            }
-
-
-            cout
-                << "\nHeat Mode : DYNAMIC Q"
-                << endl;
-
-            cout
-                << "Heat Profile Size = "
-                << heatProfile.size()
-                << endl;
-        }
-        else
-        {
-            float Q =
-                cfg.current *
-                cfg.current *
-                cfg.resistance;
-
-
-            heatProfile.push_back(Q);
-
-
-            cout
-                << "\nHeat Mode : CONSTANT Q"
-                << endl;
-
-            cout
-                << "Heat Source Q = "
-                << Q
-                << endl;
-        }
-
-
-        //--------------------------------------------------
-=======
-        heatProfile =
-            loadHeatProfile(
-                cfg.resistance
-            );
-    }
-    else
-    {
-        float Q =
-            cfg.current *
-            cfg.current *
-            cfg.resistance;
-
+    if (cfg.heatMode == DYNAMIC_Q) {
+        heatProfile = loadHeatProfile(cfg.resistance);
+    } else {
+        const float Q = cfg.current * cfg.current * cfg.resistance;
         heatProfile.push_back(Q);
     }
 
-    if(heatProfile.empty())
-    {
-        cout
-            << "Digital Twin: heat profile empty."
-            << endl;
-
+    if (heatProfile.empty()) {
+        cerr << "Digital Twin: heat profile is empty.\n";
         return;
     }
 
@@ -459,11 +215,10 @@ int main()
 
     Config cfg = initConfig();
 
-    if(ENABLE_DIGITAL_TWIN_ONLY)
-{
-    runDigitalTwinTest(cfg);
-    return 0;
-}
+    if (ENABLE_DIGITAL_TWIN_ONLY) {
+        runDigitalTwinTest(cfg);
+        return 0;
+    }
 
     //==================================================
     // V5 DATASET GENERATION
@@ -689,7 +444,6 @@ int main()
 
 
         //--------------------------------------------------
->>>>>>> development
         // Execution Mode
         //--------------------------------------------------
 
@@ -702,11 +456,7 @@ int main()
         else if(cfg.execMode == NSIGHT_MODE)
         {
             cout
-<<<<<<< HEAD
-                << "Execution Mode : NSIGHT"
-=======
                 << "Execution Mode : NSIGHT / CUDA STREAMS"
->>>>>>> development
                 << endl;
         }
         else
@@ -752,28 +502,17 @@ int main()
 
 
         //--------------------------------------------------
-<<<<<<< HEAD
-        // CPU vs GPU Validation Results
-=======
         // CPU vs GPU Validation
->>>>>>> development
         //--------------------------------------------------
 
         vector<ValidationMetrics>
             validationResults;
 
-<<<<<<< HEAD
-
-=======
->>>>>>> development
         vector<string>
             validationModelNames;
 
 
         //--------------------------------------------------
-<<<<<<< HEAD
-        // Header
-=======
         // CUDA Streams Results
         //--------------------------------------------------
 
@@ -787,7 +526,6 @@ int main()
 
         //--------------------------------------------------
         // Normal-mode CSV header
->>>>>>> development
         //--------------------------------------------------
 
         if(cfg.execMode == NORMAL_MODE)
@@ -826,10 +564,6 @@ int main()
             //--------------------------------------------------
 
             vector<float> T;
-<<<<<<< HEAD
-
-=======
->>>>>>> development
             vector<float> Tnew;
 
             initializeGrid(
@@ -854,49 +588,21 @@ int main()
             // Runtime variables
             //--------------------------------------------------
 
-<<<<<<< HEAD
-            double cpu_ms =
-                0.0;
-
-            double gpu_ms =
-                0.0;
-
-            double tiled_ms =
-                0.0;
-
-            double halo_ms =
-                0.0;
-=======
             double cpu_ms = 0.0;
             double gpu_ms = 0.0;
             double tiled_ms = 0.0;
             double halo_ms = 0.0;
->>>>>>> development
 
 
             //--------------------------------------------------
             // Final temperature fields
             //--------------------------------------------------
 
-<<<<<<< HEAD
-            vector<float>
-                finalT_CPU;
-
-            vector<float>
-                finalT_GPU;
-
-            vector<float>
-                finalT_Tiled;
-
-            vector<float>
-                finalT_Halo;
-=======
             vector<float> finalT_CPU;
             vector<float> finalT_GPU;
             vector<float> finalT_Tiled;
             vector<float> finalT_Halo;
             vector<float> finalT_Streams;
->>>>>>> development
 
 
             //==================================================
@@ -966,8 +672,6 @@ int main()
             //==================================================
             // NSIGHT MODE
             //==================================================
-<<<<<<< HEAD
-=======
             //
             // Dedicated CUDA Streams profiling mode.
             //
@@ -982,52 +686,10 @@ int main()
             // This keeps the Nsight timeline clean.
             //
             //==================================================
->>>>>>> development
 
             else if(cfg.execMode == NSIGHT_MODE)
             {
                 //--------------------------------------------------
-<<<<<<< HEAD
-                // GPU
-                //--------------------------------------------------
-
-                gpu_ms =
-                    benchmarkGPU(
-                        cfg,
-                        N,
-                        T,
-                        heatProfile,
-                        finalT_GPU
-                    );
-
-
-                //--------------------------------------------------
-                // Tiled
-                //--------------------------------------------------
-
-                tiled_ms =
-                    benchmarkTiled(
-                        cfg,
-                        N,
-                        T,
-                        heatProfile,
-                        finalT_Tiled
-                    );
-
-
-                //--------------------------------------------------
-                // Halo
-                //--------------------------------------------------
-
-                halo_ms =
-                    benchmarkHalo(
-                        cfg,
-                        N,
-                        T,
-                        heatProfile,
-                        finalT_Halo
-                    );
-=======
                 // Only run CUDA Streams for V5
                 //--------------------------------------------------
                 if(cfg.modelVersion == MODEL_V5)
@@ -1316,7 +978,6 @@ int main()
                         << modelNames[modelIndex]
                         << endl;
                 }
->>>>>>> development
             }
 
 
@@ -1431,13 +1092,6 @@ int main()
                 // THERMAL METRICS
                 //==================================================
 
-<<<<<<< HEAD
-                //--------------------------------------------------
-                // CPU
-                //--------------------------------------------------
-
-=======
->>>>>>> development
                 if(!finalT_CPU.empty())
                 {
                     ThermalMetrics cpuThermal =
@@ -1452,13 +1106,6 @@ int main()
                 }
 
 
-<<<<<<< HEAD
-                //--------------------------------------------------
-                // GPU
-                //--------------------------------------------------
-
-=======
->>>>>>> development
                 if(!finalT_GPU.empty())
                 {
                     ThermalMetrics gpuThermal =
@@ -1473,13 +1120,6 @@ int main()
                 }
 
 
-<<<<<<< HEAD
-                //--------------------------------------------------
-                // Tiled
-                //--------------------------------------------------
-
-=======
->>>>>>> development
                 if(!finalT_Tiled.empty())
                 {
                     ThermalMetrics tiledThermal =
@@ -1494,13 +1134,6 @@ int main()
                 }
 
 
-<<<<<<< HEAD
-                //--------------------------------------------------
-                // Halo
-                //--------------------------------------------------
-
-=======
->>>>>>> development
                 if(!finalT_Halo.empty())
                 {
                     ThermalMetrics haloThermal =
@@ -1533,16 +1166,10 @@ int main()
                         validation
                     );
 
-<<<<<<< HEAD
-
-                    validationModelNames.push_back(
-                        string(modelNames[modelIndex])
-=======
                     validationModelNames.push_back(
                         string(
                             modelNames[modelIndex]
                         )
->>>>>>> development
                     );
 
 
@@ -1608,13 +1235,6 @@ int main()
 
         if(cfg.saveCSV)
         {
-<<<<<<< HEAD
-            //--------------------------------------------------
-            // CPU
-            //--------------------------------------------------
-
-=======
->>>>>>> development
             if(!cpuThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -1626,13 +1246,6 @@ int main()
             }
 
 
-<<<<<<< HEAD
-            //--------------------------------------------------
-            // GPU
-            //--------------------------------------------------
-
-=======
->>>>>>> development
             if(!gpuThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -1644,13 +1257,6 @@ int main()
             }
 
 
-<<<<<<< HEAD
-            //--------------------------------------------------
-            // Tiled
-            //--------------------------------------------------
-
-=======
->>>>>>> development
             if(!tiledThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -1662,13 +1268,6 @@ int main()
             }
 
 
-<<<<<<< HEAD
-            //--------------------------------------------------
-            // Halo
-            //--------------------------------------------------
-
-=======
->>>>>>> development
             if(!haloThermalResults.empty())
             {
                 saveThermalMetricsCSV(
@@ -1700,8 +1299,6 @@ int main()
                     validationResults
                 );
             }
-<<<<<<< HEAD
-=======
 
 
             //==================================================
@@ -1759,7 +1356,6 @@ int main()
                         << endl;
                 }
             }
->>>>>>> development
         }
 
 
@@ -1777,8 +1373,6 @@ int main()
 
 
         //======================================================
-<<<<<<< HEAD
-=======
         // V5 DATASET GENERATION
         //======================================================
         //
@@ -1813,7 +1407,6 @@ int main()
 
 
         //======================================================
->>>>>>> development
         // CLEANUP
         //======================================================
 
@@ -1843,13 +1436,10 @@ int main()
         << endl;
 
     cout
-<<<<<<< HEAD
-=======
         << "V5 CUDA Streams Benchmark Completed"
         << endl;
 
     cout
->>>>>>> development
         << "=====================================\n";
 
 

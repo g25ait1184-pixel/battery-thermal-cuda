@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <vector>
@@ -7,20 +8,11 @@
 // GPU KERNEL DECLARATIONS
 //======================================================
 
-<<<<<<< HEAD
 //------------------------------------------------------
 // Global Memory GPU Stencil
+// V1–V5 thermal kernel.
+// V5 supports SOC/SOH-dependent thermal modelling.
 //------------------------------------------------------
-=======
-
-//------------------------------------------------------
-// Global Memory GPU Stencil
-//------------------------------------------------------
-//
-// V1-V5 thermal kernel.
-// V5 additionally uses SOC/SOH parameters.
-//------------------------------------------------------
->>>>>>> development
 
 __global__
 void gpuStencil(
@@ -45,7 +37,7 @@ void gpuStencil(
 
     float entropyCoeff,
 
-    // V5 SOC/SOH
+    // V5 SOC/SOH parameters
     float soc,
     float soh,
 
@@ -84,7 +76,7 @@ void tiledStencil(
 
     float entropyCoeff,
 
-    // V5 SOC/SOH
+    // V5 SOC/SOH parameters
     float soc,
     float soh,
 
@@ -123,7 +115,7 @@ void haloStencil(
 
     float entropyCoeff,
 
-    // V5 SOC/SOH
+    // V5 SOC/SOH parameters
     float soc,
     float soh,
 
@@ -139,12 +131,9 @@ void haloStencil(
 // GPU SOLVER INTERFACES
 //======================================================
 
-<<<<<<< HEAD
-=======
 
->>>>>>> development
 //------------------------------------------------------
-// Global GPU Solver
+// Global Memory GPU Solver
 //------------------------------------------------------
 
 void runGPU(
@@ -155,13 +144,9 @@ void runGPU(
     float alpha,
     int steps,
     float beta,
-<<<<<<< HEAD
-    const BatteryParameters& params,
-=======
 
     const BatteryParameters& params,
 
->>>>>>> development
     const std::vector<float>& heatProfile
 );
 
@@ -178,13 +163,9 @@ void runTiledGPU(
     float alpha,
     int steps,
     float beta,
-<<<<<<< HEAD
-    const BatteryParameters& params,
-=======
 
     const BatteryParameters& params,
 
->>>>>>> development
     const std::vector<float>& heatProfile
 );
 
@@ -201,12 +182,8 @@ void runHaloGPU(
     float alpha,
     int steps,
     float beta,
-<<<<<<< HEAD
-    const BatteryParameters& params,
-=======
 
     const BatteryParameters& params,
 
->>>>>>> development
     const std::vector<float>& heatProfile
 );
