@@ -53,7 +53,11 @@ public:
 
     bool stepHybrid();
 
+    // AI operating-domain validation
+    bool isAIValid() const;
 
+    // Automatic validity-aware execution
+    bool stepAutomatic();
     //--------------------------------------------------
     // V6 Stateful Digital Twin
     //--------------------------------------------------

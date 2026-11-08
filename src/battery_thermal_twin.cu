@@ -1,7 +1,12 @@
+
 #include "battery_thermal_twin.h"
 #include "kernels.h"
+#include "ai_inference.h"
+
 #include <cuda_runtime.h>
 #include <algorithm>
+#include <array>
+#include <string>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -9,6 +14,40 @@
 #include <vector>
 
 using namespace std;
+
+namespace
+{
+#ifndef AI_MODEL_PARAMS_PATH
+#define AI_MODEL_PARAMS_PATH "ai_model_params.json"
+#endif
+
+AIInference& getTwinAIModel()
+{
+    static AIInference model;
+    return model;
+}
+
+bool ensureTwinAIModelLoaded()
+{
+    AIInference& model = getTwinAIModel();
+
+    if (model.isLoaded())
+        return true;
+
+    return model.load(AI_MODEL_PARAMS_PATH);
+}
+
+std::array<float, 4> makeAIInput(const TwinInput& input)
+{
+    // Feature order must match train_residual.py and exported JSON.
+    return {
+        input.soc,
+        input.soh,
+        input.current_A,
+        input.temperature_C
+    };
+}
+}
 
 // ============================================================
 // CONSTRUCTOR / DESTRUCTOR
@@ -71,22 +110,33 @@ bool BatteryThermalDigitalTwin::allocateDeviceMemory()
         return false;
     }
 
-    const size_t elements = static_cast<size_t>(N) * static_cast<size_t>(N);
+    const size_t elements =
+        static_cast<size_t>(N) * static_cast<size_t>(N);
+
     const size_t bytes = elements * sizeof(float);
 
-    cudaError_t err = cudaMalloc(reinterpret_cast<void**>(&d_T_), bytes);
+    cudaError_t err = cudaMalloc(
+        reinterpret_cast<void**>(&d_T_), bytes);
+
     if (err != cudaSuccess) {
-        cerr << "ERROR: cudaMalloc(d_T): " << cudaGetErrorString(err) << '\n';
+        cerr << "ERROR: cudaMalloc(d_T): "
+             << cudaGetErrorString(err) << '\n';
+
         d_T_ = nullptr;
         return false;
     }
 
-    err = cudaMalloc(reinterpret_cast<void**>(&d_Tnew_), bytes);
+    err = cudaMalloc(
+        reinterpret_cast<void**>(&d_Tnew_), bytes);
+
     if (err != cudaSuccess) {
-        cerr << "ERROR: cudaMalloc(d_Tnew): " << cudaGetErrorString(err) << '\n';
+        cerr << "ERROR: cudaMalloc(d_Tnew): "
+             << cudaGetErrorString(err) << '\n';
+
         cudaFree(d_T_);
         d_T_ = nullptr;
         d_Tnew_ = nullptr;
+
         return false;
     }
 
@@ -101,24 +151,36 @@ bool BatteryThermalDigitalTwin::initializeThermalField()
     }
 
     const int N = twinConfig_.gridSize;
-    const size_t elements = static_cast<size_t>(N) * static_cast<size_t>(N);
+
+    const size_t elements =
+        static_cast<size_t>(N) * static_cast<size_t>(N);
+
     const size_t bytes = elements * sizeof(float);
 
-    vector<float> initialTemperature(elements, input_.temperature_C);
+    vector<float> initialTemperature(
+        elements, input_.temperature_C);
 
     cudaError_t err = cudaMemcpy(
-        d_T_, initialTemperature.data(), bytes, cudaMemcpyHostToDevice);
+        d_T_,
+        initialTemperature.data(),
+        bytes,
+        cudaMemcpyHostToDevice);
 
     if (err != cudaSuccess) {
-        cerr << "ERROR: cudaMemcpy to d_T: " << cudaGetErrorString(err) << '\n';
+        cerr << "ERROR: cudaMemcpy to d_T: "
+             << cudaGetErrorString(err) << '\n';
         return false;
     }
 
     err = cudaMemcpy(
-        d_Tnew_, initialTemperature.data(), bytes, cudaMemcpyHostToDevice);
+        d_Tnew_,
+        initialTemperature.data(),
+        bytes,
+        cudaMemcpyHostToDevice);
 
     if (err != cudaSuccess) {
-        cerr << "ERROR: cudaMemcpy to d_Tnew: " << cudaGetErrorString(err) << '\n';
+        cerr << "ERROR: cudaMemcpy to d_Tnew: "
+             << cudaGetErrorString(err) << '\n';
         return false;
     }
 
@@ -133,16 +195,10 @@ bool BatteryThermalDigitalTwin::initialize(
     const TwinInput& input,
     const vector<float>& heatProfile)
 {
-    // Release any previous CUDA allocation before reinitializing.
     reset();
 
     input_ = input;
     heatProfile_ = heatProfile;
-
-    if (heatProfile_.empty()) {
-        cerr << "ERROR: Digital Twin heat profile is empty.\n";
-        return false;
-    }
 
     if (twinConfig_.gridSize <= 2) {
         cerr << "ERROR: Digital Twin grid size must be greater than 2.\n";
@@ -154,12 +210,20 @@ bool BatteryThermalDigitalTwin::initialize(
         twinConfig_.mode == TWIN_PHYSICS ||
         twinConfig_.mode == TWIN_HYBRID;
 
-    // This source/header set does not include an AI model interface.
-    // Do not reference undeclared AI model members or unresolved AI symbols.
-    if (twinConfig_.mode == TWIN_AI ||
-        (twinConfig_.enableAI && !physicsRequested)) {
-        cerr << "ERROR: AI mode requested, but no AI model implementation "
-                "is included in this project build.\n";
+    const bool aiRequested =
+        twinConfig_.enableAI ||
+        twinConfig_.mode == TWIN_AI ||
+        twinConfig_.mode == TWIN_HYBRID;
+
+    if (physicsRequested && heatProfile_.empty()) {
+        cerr << "ERROR: Physics/Hybrid mode requires "
+                "a non-empty heat profile.\n";
+        return false;
+    }
+
+    if (aiRequested && !ensureTwinAIModelLoaded()) {
+        cerr << "ERROR: Unable to load AI model parameters from "
+             << AI_MODEL_PARAMS_PATH << '\n';
         return false;
     }
 
@@ -171,21 +235,25 @@ bool BatteryThermalDigitalTwin::initialize(
     }
 
     state_ = {};
+
     state_.time_s = 0.0f;
     state_.soc = input_.soc;
     state_.soh = input_.soh;
     state_.current_A = input_.current_A;
     state_.temperature_C = input_.temperature_C;
+
     state_.tMin_C = input_.temperature_C;
     state_.tMax_C = input_.temperature_C;
     state_.tMean_C = input_.temperature_C;
     state_.tCenter_C = input_.temperature_C;
+
     state_.thermalRange_C = 0.0f;
     state_.dt_s = input_.dt_s;
 
     updateDerivedState();
 
     output_ = {};
+
     output_.predicted_Tmax_C = input_.temperature_C;
     output_.predicted_Tmin_C = input_.temperature_C;
     output_.predicted_Tmean_C = input_.temperature_C;
@@ -195,6 +263,7 @@ bool BatteryThermalDigitalTwin::initialize(
     output_.executionMode = static_cast<int>(twinConfig_.mode);
 
     initialized_ = true;
+
     return validateState();
 }
 
@@ -214,14 +283,11 @@ void BatteryThermalDigitalTwin::synchronize(const TwinInput& input)
     state_.soh = input_.soh;
     state_.current_A = input_.current_A;
     state_.dt_s = input_.dt_s;
+
     state_.time_s += input_.dt_s;
 
-    // In physics mode, temperature is advanced by the CUDA solver.
-    // For non-physics updates, retain the externally measured temperature.
-    if (twinConfig_.mode == TWIN_AI) {
-        state_.temperature_C = input_.temperature_C;
-    }
-
+    // Keep BMS temperature as an AI input.
+    // Do not overwrite the retained physical thermal state.
     updateDerivedState();
 }
 
@@ -257,6 +323,7 @@ void BatteryThermalDigitalTwin::updateThermalState(
     state_.tMax_C = Tmax;
     state_.tMean_C = Tmean;
     state_.tCenter_C = Tcenter;
+
     state_.thermalRange_C = Tmax - Tmin;
     state_.temperature_C = Tmean;
 
@@ -266,13 +333,10 @@ void BatteryThermalDigitalTwin::updateThermalState(
 void BatteryThermalDigitalTwin::updateThermalStateFromPrediction(
     float newTemperature)
 {
-    state_.temperature_C = newTemperature;
-    state_.tMin_C = newTemperature;
-    state_.tMax_C = newTemperature;
-    state_.tMean_C = newTemperature;
-    state_.tCenter_C = newTemperature;
-    state_.thermalRange_C = 0.0f;
-    updateDerivedState();
+    // AI predicts Tmax only.
+    // It cannot reconstruct the complete thermal field.
+    // Preserve the trusted physics-derived state.
+    (void)newTemperature;
 }
 
 // ============================================================
@@ -297,15 +361,13 @@ bool BatteryThermalDigitalTwin::stepPhysics()
     }
 
     int steps = twinConfig_.physicsSteps;
-    if (steps <= 0) {
-        steps = 100;
-    }
 
-    // runGPU swaps its local input/output pointers. An even number
-    // of iterations leaves the final field in the original d_T_ buffer.
-    if ((steps % 2) != 0) {
+    if (steps <= 0)
+        steps = 100;
+
+    // Keep the final field in the original d_T_ buffer.
+    if ((steps % 2) != 0)
         ++steps;
-    }
 
     const BatteryParameters params = createV5Parameters();
 
@@ -322,12 +384,15 @@ bool BatteryThermalDigitalTwin::stepPhysics()
         heatProfile_);
 
     cudaError_t err = cudaGetLastError();
+
     if (err != cudaSuccess) {
-        cerr << "ERROR: runGPU launch: " << cudaGetErrorString(err) << '\n';
+        cerr << "ERROR: runGPU launch: "
+             << cudaGetErrorString(err) << '\n';
         return false;
     }
 
     err = cudaDeviceSynchronize();
+
     if (err != cudaSuccess) {
         cerr << "ERROR: CUDA synchronization: "
              << cudaGetErrorString(err) << '\n';
@@ -335,17 +400,24 @@ bool BatteryThermalDigitalTwin::stepPhysics()
     }
 
     const auto stop = chrono::high_resolution_clock::now();
+
     const float runtimeMs = static_cast<float>(
         chrono::duration<double, milli>(stop - start).count());
 
     const int N = twinConfig_.gridSize;
-    const size_t elements = static_cast<size_t>(N) * static_cast<size_t>(N);
+
+    const size_t elements =
+        static_cast<size_t>(N) * static_cast<size_t>(N);
+
     const size_t bytes = elements * sizeof(float);
 
     vector<float> finalTemperature(elements);
 
     err = cudaMemcpy(
-        finalTemperature.data(), d_T_, bytes, cudaMemcpyDeviceToHost);
+        finalTemperature.data(),
+        d_T_,
+        bytes,
+        cudaMemcpyDeviceToHost);
 
     if (err != cudaSuccess) {
         cerr << "ERROR: Copying final temperature field: "
@@ -355,9 +427,11 @@ bool BatteryThermalDigitalTwin::stepPhysics()
 
     float Tmin = numeric_limits<float>::max();
     float Tmax = numeric_limits<float>::lowest();
+
     double sum = 0.0;
 
     for (const float temperature : finalTemperature) {
+
         if (!isfinite(temperature)) {
             cerr << "ERROR: Non-finite temperature returned by GPU solver.\n";
             return false;
@@ -365,6 +439,7 @@ bool BatteryThermalDigitalTwin::stepPhysics()
 
         Tmin = min(Tmin, temperature);
         Tmax = max(Tmax, temperature);
+
         sum += static_cast<double>(temperature);
     }
 
@@ -372,6 +447,7 @@ bool BatteryThermalDigitalTwin::stepPhysics()
         sum / static_cast<double>(elements));
 
     const int center = N / 2;
+
     const float Tcenter = finalTemperature[
         static_cast<size_t>(center) * static_cast<size_t>(N) +
         static_cast<size_t>(center)];
@@ -382,6 +458,7 @@ bool BatteryThermalDigitalTwin::stepPhysics()
     output_.predicted_Tmin_C = Tmin;
     output_.predicted_Tmean_C = Tmean;
     output_.thermalRange_C = Tmax - Tmin;
+
     output_.predictionError_C = 0.0f;
     output_.inferenceTime_ms = runtimeMs;
     output_.executionMode = static_cast<int>(TWIN_PHYSICS);
@@ -390,29 +467,124 @@ bool BatteryThermalDigitalTwin::stepPhysics()
 }
 
 // ============================================================
-// AI STEP
+// AI STEP - BASE MLP INFERENCE
 // ============================================================
 
 bool BatteryThermalDigitalTwin::stepAI()
 {
-    cerr << "ERROR: stepAI() is unavailable: AI model headers, "
-            "implementation, and model data are not part of the supplied "
-            "project files.\n";
-    return false;
+    if (!initialized_) {
+        cerr << "ERROR: Digital Twin is not initialized.\n";
+        return false;
+    }
+
+    if (!ensureTwinAIModelLoaded()) {
+        cerr << "ERROR: AI model parameters could not be loaded.\n";
+        return false;
+    }
+
+    AIInference& model = getTwinAIModel();
+
+    const array<float, 4> features = makeAIInput(input_);
+
+    if (!model.isWithinValidatedDomain(features)) {
+        cerr << "ERROR: AI input is outside the validated operating domain. "
+                "Use Hybrid mode for automatic V5 physics fallback.\n";
+        return false;
+    }
+
+    const auto start = chrono::high_resolution_clock::now();
+
+    float predictedTmaxC = 0.0f;
+
+    if (!model.predictBase(features, predictedTmaxC)) {
+        cerr << "ERROR: Base MLP inference failed.\n";
+        return false;
+    }
+
+    const auto stop = chrono::high_resolution_clock::now();
+
+    const float runtimeMs = static_cast<float>(
+        chrono::duration<double, milli>(stop - start).count());
+
+    // Base AI predicts Tmax only.
+    output_.predicted_Tmax_C = predictedTmaxC;
+    output_.predicted_Tmin_C = numeric_limits<float>::quiet_NaN();
+    output_.predicted_Tmean_C = numeric_limits<float>::quiet_NaN();
+
+    output_.thermalRange_C = numeric_limits<float>::quiet_NaN();
+    output_.predictionError_C = numeric_limits<float>::quiet_NaN();
+
+    output_.inferenceTime_ms = runtimeMs;
+    output_.executionMode = static_cast<int>(TWIN_AI);
+
+    return validateState();
 }
 
 // ============================================================
-// HYBRID STEP
+// HYBRID STEP - BASE MLP + RESIDUAL MLP / PHYSICS FALLBACK
 // ============================================================
 
 bool BatteryThermalDigitalTwin::stepHybrid()
 {
-    // A true hybrid step requires both the physics solver and a working
-    // AI prediction/residual model. Do not label a physics-only result
-    // as hybrid.
-    cerr << "ERROR: stepHybrid() requires an AI model implementation. "
-            "The supplied project currently contains no AI model interface.\n";
-    return false;
+    if (!initialized_) {
+        cerr << "ERROR: Digital Twin is not initialized.\n";
+        return false;
+    }
+
+    if (!ensureTwinAIModelLoaded()) {
+        cerr << "ERROR: AI model parameters could not be loaded.\n";
+        return false;
+    }
+
+    AIInference& model = getTwinAIModel();
+
+    const array<float, 4> features = makeAIInput(input_);
+
+    // Input-domain validity check.
+    if (twinConfig_.enableValidation &&
+        !model.isWithinValidatedDomain(features)) {
+
+        cerr << "WARNING: Input outside validated AI domain; "
+                "switching to V5 CUDA physics.\n";
+
+        return stepPhysics();
+    }
+
+    const auto start = chrono::high_resolution_clock::now();
+
+    float basePredictionC = 0.0f;
+    float residualCorrectionC = 0.0f;
+    float hybridPredictionC = 0.0f;
+
+    if (!model.predictHybrid(
+            features,
+            basePredictionC,
+            residualCorrectionC,
+            hybridPredictionC)) {
+
+        cerr << "ERROR: Hybrid MLP inference failed.\n";
+        return false;
+    }
+
+    const auto stop = chrono::high_resolution_clock::now();
+
+    const float runtimeMs = static_cast<float>(
+        chrono::duration<double, milli>(stop - start).count());
+
+    // Hybrid AI predicts Tmax only.
+    // Do not overwrite the physical thermal state.
+    output_.predicted_Tmax_C = hybridPredictionC;
+
+    output_.predicted_Tmin_C = numeric_limits<float>::quiet_NaN();
+    output_.predicted_Tmean_C = numeric_limits<float>::quiet_NaN();
+
+    output_.thermalRange_C = numeric_limits<float>::quiet_NaN();
+    output_.predictionError_C = numeric_limits<float>::quiet_NaN();
+
+    output_.inferenceTime_ms = runtimeMs;
+    output_.executionMode = static_cast<int>(TWIN_HYBRID);
+
+    return validateState();
 }
 
 // ============================================================
@@ -421,15 +593,13 @@ bool BatteryThermalDigitalTwin::stepHybrid()
 
 void BatteryThermalDigitalTwin::updateSOC()
 {
-    // SOC is supplied by the BMS through TwinInput. No battery-capacity
-    // integration model or current sign convention is declared here.
+    // SOC is supplied by the BMS through TwinInput.
     state_.soc = input_.soc;
 }
 
 void BatteryThermalDigitalTwin::updateSOH()
 {
-    // SOH is supplied by the BMS through TwinInput. No ageing model is
-    // declared in the supplied headers.
+    // SOH is supplied by the BMS through TwinInput.
     state_.soh = input_.soh;
 }
 
@@ -463,8 +633,13 @@ bool BatteryThermalDigitalTwin::updateState()
     updateSOC();
     updateSOH();
     updateElectroThermalState();
+
     return validateState();
 }
+
+// ============================================================
+// STATEFUL STEP
+// ============================================================
 
 bool BatteryThermalDigitalTwin::step(const TwinInput& input)
 {
@@ -476,6 +651,7 @@ bool BatteryThermalDigitalTwin::step(const TwinInput& input)
     synchronize(input);
 
     switch (twinConfig_.mode) {
+
         case TWIN_PHYSICS:
             return stepPhysics();
 
@@ -483,7 +659,9 @@ bool BatteryThermalDigitalTwin::step(const TwinInput& input)
             return stepAI();
 
         case TWIN_HYBRID:
-            return stepHybrid();
+            // IMPORTANT:
+            // Apply both input validity and thermal-state validity.
+            return stepAutomatic();
 
         default:
             cerr << "ERROR: Unsupported Digital Twin execution mode.\n";
@@ -529,6 +707,62 @@ void BatteryThermalDigitalTwin::reset()
     }
 
     heatProfile_.clear();
+
     initialized_ = false;
     output_ = {};
+}
+
+// ============================================================
+// AI OPERATING-DOMAIN VALIDATION
+// ============================================================
+
+bool BatteryThermalDigitalTwin::isAIValid() const
+{
+    // These limits must match the validated training domain.
+    return std::isfinite(input_.soc) &&
+           std::isfinite(input_.soh) &&
+           std::isfinite(input_.current_A) &&
+           std::isfinite(input_.temperature_C) &&
+
+           input_.soc >= 0.20f &&
+           input_.soc <= 1.00f &&
+
+           input_.soh >= 0.70f &&
+           input_.soh <= 1.00f &&
+
+           input_.current_A >= 10.0f &&
+           input_.current_A <= 30.0f &&
+
+           input_.temperature_C >= 15.0f &&
+           input_.temperature_C <= 45.0f;
+}
+
+// ============================================================
+// AUTOMATIC VALIDITY-AWARE EXECUTION
+// ============================================================
+
+bool BatteryThermalDigitalTwin::stepAutomatic()
+{
+    if (!initialized_) {
+        cerr << "ERROR: Digital Twin is not initialized.\n";
+        return false;
+    }
+
+    // Check current BMS operating conditions.
+    const bool inputValid = isAIValid();
+
+    // Check the retained physical thermal state.
+    const bool thermalStateValid =
+        std::isfinite(state_.tMax_C) &&
+        state_.tMax_C <= 45.0f;
+
+    // Execute Hybrid AI only when both checks pass.
+    if (inputValid && thermalStateValid) {
+        return stepHybrid();
+    }
+
+    cerr << "WARNING: AI operating conditions invalid; "
+            "switching to V5 CUDA physics.\n";
+
+    return stepPhysics();
 }

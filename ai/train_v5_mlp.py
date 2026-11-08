@@ -1,3 +1,4 @@
+
 import os
 import pandas as pd
 import numpy as np
@@ -7,11 +8,27 @@ import torch.nn as nn
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score
+)
+
+# ============================================================
+# REPRODUCIBILITY
+# ============================================================
+
+SEED = 42
+
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
 
 
 # ============================================================
-# 1. Configuration
+# 1. CONFIGURATION
 # ============================================================
 
 DATASET_DIR = "dataset/v5_1000"
@@ -27,10 +44,12 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 
 # ============================================================
-# 2. Device
+# 2. DEVICE
 # ============================================================
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
+)
 
 print("=" * 60)
 print("V5 AI Thermal Predictor")
@@ -39,13 +58,14 @@ print("=" * 60)
 print("PyTorch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
 print("Device:", device)
+print("Random seed:", SEED)
 
 if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 
 
 # ============================================================
-# 3. Load dataset
+# 3. LOAD DATASET
 # ============================================================
 
 metadata = pd.read_csv(METADATA_FILE)
@@ -58,12 +78,13 @@ df = pd.merge(
 )
 
 print("\nDataset shape:", df.shape)
+
 print("\nColumns:")
 print(df.columns.tolist())
 
 
 # ============================================================
-# 4. Input features and target
+# 4. INPUT FEATURES AND TARGET
 # ============================================================
 
 features = [
@@ -76,9 +97,13 @@ features = [
 target = "T_max_C"
 
 X = df[features].values.astype(np.float32)
-y = df[target].values.astype(np.float32).reshape(-1, 1)
+
+y = df[target].values.astype(
+    np.float32
+).reshape(-1, 1)
 
 print("\nInput features:")
+
 for f in features:
     print("  ", f)
 
@@ -86,14 +111,14 @@ print("Target:", target)
 
 
 # ============================================================
-# 5. Train / test split
+# 5. TRAIN / TEST SPLIT
 # ============================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
     test_size=0.20,
-    random_state=42
+    random_state=SEED
 )
 
 print("\nTraining samples:", len(X_train))
@@ -101,7 +126,7 @@ print("Testing samples :", len(X_test))
 
 
 # ============================================================
-# 6. Normalize data
+# 6. NORMALIZE DATA
 # ============================================================
 
 x_scaler = StandardScaler()
@@ -115,7 +140,7 @@ y_test_scaled = y_scaler.transform(y_test)
 
 
 # ============================================================
-# 7. Convert to PyTorch tensors
+# 7. CONVERT TO PYTORCH TENSORS
 # ============================================================
 
 X_train_tensor = torch.tensor(
@@ -140,7 +165,7 @@ y_test_tensor = torch.tensor(
 
 
 # ============================================================
-# 8. Define MLP
+# 8. DEFINE BASE MLP
 # ============================================================
 
 class V5ThermalMLP(nn.Module):
@@ -171,9 +196,17 @@ model = V5ThermalMLP().to(device)
 print("\nModel:")
 print(model)
 
+parameter_count = sum(
+    p.numel()
+    for p in model.parameters()
+    if p.requires_grad
+)
+
+print("\nTrainable parameters:", parameter_count)
+
 
 # ============================================================
-# 9. Loss and optimizer
+# 9. LOSS AND OPTIMIZER
 # ============================================================
 
 criterion = nn.MSELoss()
@@ -185,7 +218,7 @@ optimizer = torch.optim.Adam(
 
 
 # ============================================================
-# 10. Training
+# 10. TRAINING
 # ============================================================
 
 epochs = 1000
@@ -212,13 +245,13 @@ for epoch in range(epochs):
     if (epoch + 1) % 100 == 0:
 
         print(
-            f"Epoch [{epoch+1:4d}/{epochs}] "
+            f"Epoch [{epoch + 1:4d}/{epochs}] "
             f"Loss = {loss.item():.6f}"
         )
 
 
 # ============================================================
-# 11. Prediction
+# 11. PREDICTION
 # ============================================================
 
 model.eval()
@@ -230,7 +263,7 @@ with torch.no_grad():
     ).cpu().numpy()
 
 
-# Convert back to °C
+# Convert predictions back to Celsius
 
 y_pred = y_scaler.inverse_transform(
     y_pred_scaled
@@ -240,7 +273,7 @@ y_actual = y_test
 
 
 # ============================================================
-# 12. Accuracy metrics
+# 12. ACCURACY METRICS
 # ============================================================
 
 rmse = np.sqrt(
@@ -270,7 +303,7 @@ print(f"R²   : {r2:.6f}")
 
 
 # ============================================================
-# 13. Save model
+# 13. SAVE MODEL
 # ============================================================
 
 model_path = os.path.join(
@@ -288,7 +321,7 @@ print(model_path)
 
 
 # ============================================================
-# 14. Save predictions
+# 14. SAVE PREDICTIONS
 # ============================================================
 
 results = pd.DataFrame({
@@ -321,5 +354,10 @@ print(prediction_file)
 
 print("\nFirst 10 predictions:")
 print(results.head(10))
+
+
+# ============================================================
+# 15. COMPLETION
+# ============================================================
 
 print("\nTraining complete.")

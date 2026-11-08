@@ -4,7 +4,7 @@ This repository contains the implementation and experimental artifacts associate
 
 **"GPU-Accelerated Physics-AI Thermal Digital Twins: A Scalable Scientific Computing Framework"**
 
-The work presents an integrated framework combining high-fidelity electro-thermal physics modeling, Physics-AI residual learning, validity-aware model switching, and CUDA-accelerated scientific computing for battery thermal Digital Twins.
+The work presents an integrated framework combining high-fidelity electro-thermal physics modelling, Physics-AI residual learning, validity-aware model switching, and CUDA-accelerated scientific computing for battery thermal Digital Twins.
 
 ---
 
@@ -12,14 +12,15 @@ The work presents an integrated framework combining high-fidelity electro-therma
 
 High-fidelity electro-thermal simulations can become computationally expensive when evaluated over large spatial grids and repeated operating conditions.
 
-This work addresses this challenge through a multi-fidelity Physics-AI framework that combines:
+This work addresses this challenge through a multi-fidelity Physics-AI framework combining:
 
-- High-fidelity electro-thermal physics modeling
-- SOC/SOH-aware thermal modeling
+- High-fidelity electro-thermal physics modelling
+- SOC/SOH-aware thermal modelling
 - Neural-network-based thermal prediction
 - Residual learning for prediction refinement
 - Validity-aware Physics-AI model switching
 - Physics-based fallback outside the validated AI domain
+- Stateful Digital Twin execution with automatic Hybrid AI / V5 Physics switching
 - CUDA-accelerated thermal stencil computation
 - Shared-memory tiling
 - Halo-based data reuse
@@ -31,9 +32,7 @@ The physics model serves as the high-fidelity reference and fallback model, whil
 
 ---
 
-## 2. Framework
-
-The overall framework is:
+## 2. Framework Architecture
 
 ```text
                 High-Fidelity
@@ -71,16 +70,16 @@ The reference thermal model incorporates:
 - Current-dependent Joule heating
 - Temperature-dependent resistance
 - Entropy heat generation
-- SOC-dependent behavior
-- SOH-dependent behavior
+- SOC-dependent behaviour
+- SOH-dependent behaviour
 
-The physics model is used to generate the reference thermal response for AI training and evaluation and remains available as the trusted fallback outside the validated AI operating region.
+The physics model generates reference thermal responses for AI training and evaluation and remains available as the trusted fallback outside the validated AI operating region.
 
 ---
 
 ## 4. Physics-AI Model
 
-The base AI model predicts the maximum thermal response from four operating variables:
+The base AI model predicts maximum thermal response from four operating variables:
 
 - SOC
 - SOH
@@ -107,10 +106,10 @@ T_PAI = T_AI + g_phi(x)
 
 where:
 
-- `T_AI` is the base AI prediction
-- `g_phi(x)` is the learned residual correction
-- `T_PAI` is the final Physics-AI prediction
-- `x` represents the operating conditions
+- `T_AI` is the base AI prediction.
+- `g_phi(x)` is the learned residual correction.
+- `T_PAI` is the final Physics-AI prediction.
+- `x` represents the operating conditions.
 
 The residual network learns the remaining prediction error of the base AI model rather than learning the complete thermal response from the beginning.
 
@@ -161,27 +160,144 @@ The CPU and CUDA implementations use consistent physical parameters, initial con
 
 ---
 
-## 7. Physics-AI Results
+## 7. Compilation and Execution
 
-The primary evaluation using seed 42 gives:
+### 7.1 Requirements
 
-| Model | RMSE (°C) | MAE (°C) | R² |
-|---|---:|---:|---:|
-| Base AI | 0.1750 | 0.1394 | 0.999625 |
-| Base AI + Residual | 0.1409 | 0.1081 | 0.999757 |
+- NVIDIA CUDA-capable GPU
+- NVIDIA CUDA Toolkit
+- CUDA-compatible C++ compiler
+- `nvcc` compiler
+- Python 3.x
+- Required Python packages used by the AI and analysis scripts
 
-The five-seed evaluation gives:
+### 7.2 Navigate to the project directory
 
-| Model | RMSE (°C) |
-|---|---:|
-| Base AI | 0.1715 ± 0.0104 |
-| Base AI + Residual | 0.1246 ± 0.0113 |
+For Google Colab:
 
-The results demonstrate the improvement obtained by residual learning over the base AI predictor.
+```bash
+cd /content/drive/MyDrive/CUDA_Project/project
+```
+
+For a local clone:
+
+```bash
+cd battery-thermal-cuda
+```
+
+### 7.3 Compile the normal execution application
+
+The following command enables relocatable device code to support CUDA device functions referenced across separate CUDA source files.
+
+```bash
+nvcc \
+-rdc=true \
+-Wno-deprecated-gpu-targets \
+-DHEAT_MODE=DYNAMIC_Q_MODE \
+-DEXEC_MODE=NORMAL_EXECUTION \
+-Iinclude \
+src/*.cu \
+kernels/*.cu \
+-o thermal
+```
+
+**Note:** `NORMAL_EXECUTION` and `DYNAMIC_Q_MODE` must match the definitions in the project headers and source files. The `-rdc=true` option requires the referenced device-function implementations to be present in the compiled CUDA source files.
+
+### 7.4 Run the application
+
+```bash
+./thermal
+```
+
+The application displays the following interactive menu:
+
+```text
+=====================================
+BATTERY THERMAL SIMULATION
+=====================================
+1. Normal V1-V5 execution
+2. Digital Twin - Automatic validity-aware routing
+3. Digital Twin - Physics / Base AI / Hybrid comparison
+4. Digital Twin - Stateful closed-loop test
+5. Run all Digital Twin tests
+```
+
+### 7.5 Menu options
+
+| Option | Execution mode | Description |
+|---:|---|---|
+| 1 | Normal V1–V5 execution | Runs the standard battery thermal simulations and configured GPU benchmarks. |
+| 2 | Digital Twin – Automatic validity-aware routing | Automatically selects Hybrid AI within the configured validity conditions and V5 CUDA physics otherwise. |
+| 3 | Digital Twin – Physics / Base AI / Hybrid comparison | Compares predictions from V5 physics, Base AI, and Hybrid AI. |
+| 4 | Digital Twin – Stateful closed-loop test | Exercises stateful Digital Twin execution and automatic switching across operating conditions. |
+| 5 | Run all Digital Twin tests | Executes the configured Digital Twin test suite. |
+
+Select the required option when prompted by the application.
+
+### 7.6 Nsight execution build
+
+For CUDA stream and profiling experiments, compile using:
+
+```bash
+nvcc \
+-rdc=true \
+-Wno-deprecated-gpu-targets \
+-DHEAT_MODE=DYNAMIC_Q_MODE \
+-DEXEC_MODE=NSIGHT_EXECUTION \
+-Iinclude \
+src/*.cu \
+kernels/*.cu \
+-o thermal
+```
+
+Run the executable:
+
+```bash
+./thermal
+```
+
+If Nsight Systems is installed, profile the execution using:
+
+```bash
+mkdir -p results
+
+nsys profile \
+--stats=true \
+-o results/v5_nsight \
+./thermal
+```
+
+The profiling configuration is intended to evaluate CUDA stream execution and workload concurrency. Compilation alone does not establish stream overlap or performance improvement.
 
 ---
 
-## 8. CUDA Performance
+## 8. Physics-AI Results
+
+The AI models predict scalar maximum temperature (`T_max_C`) using four operating inputs. The residual network learns the Base MLP's training-set prediction error, and the Hybrid AI output is:
+
+```text
+T_hybrid = T_base + T_residual
+```
+
+### 8.1 Five-seed evaluation
+
+A fixed 80/20 train/test split (`random_state=42`) was used for all five independent model initializations. Each initialization trained a separate Base MLP and its corresponding Residual MLP. The test set contains 200 cases.
+
+| Metric | Base MLP (mean ± SD) | Hybrid AI (mean ± SD) |
+|---|---:|---:|
+| RMSE (°C) | 0.192780 ± 0.011577 | **0.168340 ± 0.013797** |
+| MAE (°C) | 0.150962 ± 0.011023 | **0.127764 ± 0.012317** |
+| R² | 0.999544 ± 0.000054 | **0.999651 ± 0.000058** |
+
+The Hybrid AI reduces mean RMSE by 12.68% and mean MAE by 15.37% relative to the Base MLP. Both error metrics improved in all five initializations.
+
+**Evaluation clarification:** This is a five-initialization experiment on one fixed train/test split; it is not five independent data splits. The reference targets are generated by the V5 physics model, so these results quantify agreement with the simulation reference rather than independent experimental battery accuracy.
+
+The seed-42 checkpoint pair is also used for the performance comparison in Section 16.
+
+---
+
+## 9. CUDA Performance
 
 The CUDA implementation provides substantial acceleration over the CPU reference.
 
@@ -203,7 +319,7 @@ for all evaluated grid sizes.
 
 ---
 
-## 9. Roofline Analysis
+## 10. Roofline Analysis
 
 The thermal stencil has an arithmetic intensity of approximately:
 
@@ -219,11 +335,11 @@ At 2048 × 2048, the measured performance is:
 | Tiled | 147.38 | 505.31 |
 | Halo | 166.69 | 571.49 |
 
-The roofline analysis is used to characterize the computational and memory behavior of the CUDA thermal solver.
+The roofline analysis is used to characterize the computational and memory behaviour of the CUDA thermal solver.
 
 ---
 
-## 10. CUDA Stream Concurrency
+## 11. CUDA Stream Concurrency
 
 Independent thermal workloads are evaluated using multiple CUDA streams.
 
@@ -240,35 +356,50 @@ The results demonstrate improved aggregate throughput with increasing stream con
 
 ---
 
-## 11. Validity-Aware Digital Twin
+## 12. Validity-Aware Digital Twin
 
-The validated Physics-AI operating region is:
+The Digital Twin combines the Hybrid AI predictor with the V5 CUDA physics solver and selects the execution path according to the validated operating domain.
+
+### 12.1 Validated AI operating region
 
 | Parameter | Validated Range |
 |---|---|
 | SOC | 0.20–1.00 |
 | SOH | 0.70–1.00 |
 | Current | 10–30 A |
-| Temperature | 15–45 °C |
+| Initial temperature | 15–45 °C |
 
-Within this validated region, the Physics-AI model is used.
+The automatic execution path checks AI input validity and applies a physical thermal-state guard. In the current implementation, Hybrid AI is selected only when the input is within the validated domain and the retained physical `Tmax` is at or below 45 °C. Otherwise, execution falls back to V5 CUDA physics.
 
-When the operating state moves outside the validated AI region, the Digital Twin switches to the high-fidelity physics model.
+The 45 °C guard is an implementation-specific conservative routing threshold associated with the validated domain; it is not asserted as a universal battery safety limit.
 
-A 10-step trajectory demonstrates the switching mechanism:
+### 12.2 Model responsibilities
 
-```text
-Steps 1–5 : Physics-AI
-Steps 6–10: Physics fallback
+- **Base MLP:** Predicts scalar maximum temperature.
+- **Residual MLP:** Predicts a scalar correction in °C.
+- **Hybrid AI:** Adds the residual correction to the Base MLP prediction.
+- **V5 CUDA Physics:** Computes the spatial thermal field and its thermal statistics, including `Tmin`, `Tmax`, and `Tmean`.
 
-Physics-AI utilization: 50%
-```
+The AI prediction does not reconstruct or advance the full spatial thermal field. The Digital Twin preserves the physical field separately when an AI scalar prediction is used.
 
-This demonstrates state-dependent model selection while retaining the physics solver as a fallback outside the validated AI domain.
+### 12.3 Stateful and automatic-routing experiments
+
+The automatic Digital Twin tests exercised changing operating conditions and demonstrated switching between Hybrid AI and V5 CUDA physics.
+
+| Test | Steps | Hybrid AI steps | Physics steps | Hybrid utilization |
+|---|---:|---:|---:|---:|
+| Dynamic routing test | 7 | 4 | 3 | 57.14% |
+| Stateful test | 10 | 5 | 5 | 50.00% |
+
+In the 10-step stateful test, the first five steps used Hybrid AI. As the physical thermal state crossed the configured routing guard, the remaining five steps used V5 CUDA physics.
+
+The physical temperature field continued to be maintained by the physics path; AI supplied only scalar `Tmax` estimates.
+
+These tests verify the implemented stateful routing behaviour for the tested trajectories. They do not establish long-duration closed-loop validation or independent experimental battery performance.
 
 ---
 
-## 12. Repository Structure
+## 13. Repository Structure
 
 The main repository components include:
 
@@ -300,7 +431,7 @@ The repository also contains supporting files for dataset generation, CUDA bench
 
 ---
 
-## 13. Key Experimental Artifacts
+## 14. Key Experimental Artifacts
 
 The repository contains artifacts associated with the reported experiments, including:
 
@@ -314,14 +445,18 @@ The repository contains artifacts associated with the reported experiments, incl
 - CUDA stream implementation
 - Thermal maps
 - AI model results
-- Residual Physics-AI results
+- Five-seed Base MLP and Hybrid AI metrics, summary, and per-case predictions
+- Seed-specific Base and Residual model checkpoints
+- Final seed-42 performance benchmark and per-case prediction CSVs
 - CUDA performance results
 - Roofline analysis data
-- Digital Twin evaluation results
+- Dynamic Digital Twin routing test results
+- Stateful 10-step Digital Twin test results
+- Physics / Base AI / Hybrid AI comparison results
 
 ---
 
-## 14. Reproducibility
+## 15. Reproducibility
 
 The primary AI experiments use:
 
@@ -333,62 +468,68 @@ Additional random seeds are used for multi-seed robustness evaluation.
 
 The CUDA experiments use consistent physical and numerical configurations between the CPU and GPU implementations to enable direct numerical and performance comparison.
 
-### Requirements
+### Reproduction workflow
 
-Reproduction requires:
+1. Clone the repository.
+2. Install the required CUDA Toolkit and Python dependencies.
+3. Generate or load the V5 physics dataset.
+4. Train the Base MLP and Residual MLP.
+5. Compile the CUDA application.
+6. Run the required thermal and Digital Twin experiments.
+7. Inspect the generated performance and evaluation artifacts.
 
-- NVIDIA CUDA-capable GPU
-- CUDA Toolkit
-- C/C++ compiler with `nvcc`
-- Python 3.x
-- Required Python packages used by the AI and analysis scripts
-
-The exact execution commands depend on the corresponding source files and scripts included in the repository.
-
----
-
-## 15. Dataset
-
-The thermal reference simulations use a high-fidelity SOC/SOH-aware electro-thermal model.
-
-A dynamic heat-generation profile containing 1,698 samples is used from the NASA Battery Data Set.
-
-The AI dataset consists of 1,000 operating cases generated from the physics model.
-
-The AI cases cover:
-
-| Parameter | Range |
-|---|---|
-| SOC | 0.20–1.00 |
-| SOH | 0.70–1.00 |
-| Current | 10–30 A |
-| Initial Temperature | 15–45 °C |
+The exact execution commands for individual experiments depend on the source files and scripts included in the repository.
 
 ---
 
 ## 16. Performance Summary
 
-### AI Prediction
+### 16.1 Five-seed AI accuracy
 
 ```text
-Base AI RMSE:             0.1750 °C
-Base AI + Residual RMSE:  0.1409 °C
+Base MLP RMSE:       0.192780 ± 0.011577 °C
+Hybrid AI RMSE:      0.168340 ± 0.013797 °C
 
-Base AI MAE:              0.1394 °C
-Base AI + Residual MAE:   0.1081 °C
+Base MLP MAE:        0.150962 ± 0.011023 °C
+Hybrid AI MAE:       0.127764 ± 0.012317 °C
+
+RMSE improvement:   12.68%
+MAE improvement:    15.37%
 ```
 
-### Multi-Seed Evaluation
+### 16.2 Seed-42 performance benchmark
+
+The performance benchmark used the same 200 held-out cases and the seed-42 Base and Residual checkpoints.
+
+| Method | RMSE (°C) | MAE (°C) | R² | Runtime per case (ms) |
+|---|---:|---:|---:|---:|
+| V5 Physics CUDA | — | — | — | 0.906417 |
+| Base AI GPU | 0.205296 | 0.159564 | 0.999484 | 0.000962 |
+| Hybrid AI GPU | 0.183997 | 0.142309 | 0.999585 | 0.001802 |
+
+The V5 runtime is the average of previously recorded per-case simulation runtimes (181.283426 ms summed over 200 cases). Base AI and Hybrid AI times are median CUDA-event measurements of a batch of 200 predictions, divided by 200. AI timing used 50 warm-up runs and 500 measurement runs on an NVIDIA Tesla T4.
+
+The Hybrid AI improved seed-42 RMSE by 10.37% and MAE by 10.81% relative to Base AI.
+
+The physics accuracy columns are intentionally left blank because V5 physics supplies the reference targets; comparing the solver against its own generated targets would be a self-reference, not independent accuracy validation.
+
+**Timing caveat:** The physics runtimes were recorded during dataset simulation, whereas AI timings were measured in a separate repeated inference benchmark. Ratios derived from these values are indicative reference-runtime comparisons, not controlled end-to-end application speedups. The AI timing is model inference only and excludes preprocessing and host-to-device transfer.
+
+### 16.3 Stateful Digital Twin routing
 
 ```text
-Base AI:
-0.1715 ± 0.0104 °C
+Dynamic routing test:
+7 steps; 4 Hybrid AI; 3 V5 Physics
+Hybrid utilization: 57.14%
 
-Base AI + Residual:
-0.1246 ± 0.0113 °C
+Stateful test:
+10 steps; 5 Hybrid AI; 5 V5 Physics
+Hybrid utilization: 50.00%
 ```
 
-### CUDA Solver
+The routing tests demonstrate automatic selection of Hybrid AI within the implemented validity conditions and V5 CUDA physics when the conditions are not satisfied.
+
+### 16.4 CUDA solver
 
 ```text
 Largest grid:             2048 × 2048
@@ -397,12 +538,7 @@ Maximum CPU-GPU speedup:  1238.8×
 Numerical RMSE:           < 2 × 10⁻⁶ °C
 ```
 
-### CUDA Streams
-
-```text
-Maximum aggregate speedup:
-1.92× with 8 streams
-```
+These CUDA solver results are reported separately from the AI inference benchmark.
 
 ---
 
@@ -428,27 +564,27 @@ The repository provides the implementation and experimental artifacts supporting
 
 ## 18. Scope and Limitations
 
-The current implementation focuses on maximum-temperature prediction and validity-aware model switching.
+The current implementation focuses on scalar maximum-temperature prediction by AI, with the V5 CUDA physics solver retaining full spatial thermal-field computation and serving as the fallback path.
+
+The current work demonstrates:
+
+- Physics-generated dataset training and held-out evaluation.
+- Five model initializations on a fixed train/test split.
+- Base-plus-residual Hybrid AI prediction.
+- Validity-aware automatic selection between Hybrid AI and V5 CUDA physics.
+- Stateful routing tests over the reported 7-step and 10-step trajectories.
 
 The current work does not yet provide:
 
-- Recursive next-state thermal prediction
-- Complete spatial thermal-field AI prediction
-- Realistic vehicle drive-cycle validation
-- Closed-loop long-duration Digital Twin validation
-- Actual BMS measurement integration
-- Multi-GPU validation
+- Independent experimental battery validation against measured cell or pack thermal data.
+- AI prediction of the complete spatial thermal field.
+- Long-duration closed-loop Digital Twin validation.
+- Full integration with live BMS measurements in a deployed battery system.
+- Multi-GPU validation.
 
-These are considered directions for future work.
+These are directions for future work. The reported AI accuracy is agreement with V5 simulation-generated reference targets and should not be interpreted as experimental battery prediction accuracy.
 
-The proposed framework can also be extended to other thermal-management applications, including:
-
-- AI data-center cooling
-- High-performance computing thermal management
-- Liquid-based thermal management
-- Other large-scale thermal Digital Twins
-
-These applications are proposed as future extensions and are not directly validated by the current experiments.
+The framework may be extended to other thermal-management applications, including data-center cooling, high-performance computing thermal management, liquid-based thermal management, and other large-scale thermal Digital Twins. These are proposed extensions and are not validated by the current experiments.
 
 ---
 

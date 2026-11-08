@@ -1,0 +1,2 @@
+Model,Architecture,Parameters,RMSE,MAE,R2,Epochs,Learning_Rate,Seed
+Parameter-Matched Single MLP,4-25-37-30-1,2258,0.21954236256992365,0.1705377995967865,0.9994098544120789,1000,0.001,42
