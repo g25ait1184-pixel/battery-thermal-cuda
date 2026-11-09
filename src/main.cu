@@ -1273,6 +1273,178 @@ void runStatefulDigitalTwinTest(
 //======================================================
 // MAIN
 //======================================================
+
+//======================================================
+// OPTION 6: V5 GPU PERFORMANCE BENCHMARK
+//======================================================
+void runGPUPerformanceBenchmark(Config cfg)
+{
+    cout << "\n=====================================\n";
+    cout << "GPU PERFORMANCE BENCHMARK - MODEL V5\n";
+    cout << "=====================================\n";
+
+    // Run the existing benchmark implementations in normal mode.
+    cfg.modelVersion = MODEL_V5;
+    cfg.execMode = NORMAL_MODE;
+    cfg.sizes = {256, 512, 1024, 2048};
+
+    cout << "Model      : V5 SOC/SOH-aware electro-thermal model\n";
+    cout << "Grid sizes : 256, 512, 1024, 2048\n";
+    cout << "Runs       : " << cfg.RUNS << "\n";
+    cout << "Steps      : " << cfg.steps << "\n";
+
+    // Build the same heat profile used by the existing workflow.
+    vector<float> heatProfile;
+
+    if(cfg.heatMode == DYNAMIC_Q)
+    {
+        heatProfile = loadHeatProfile(cfg.resistance);
+    }
+    else
+    {
+        const float Q = cfg.current * cfg.current * cfg.resistance;
+        heatProfile.push_back(Q);
+    }
+
+    if(heatProfile.empty())
+    {
+        cerr << "ERROR: GPU benchmark heat profile is empty.\n";
+        return;
+    }
+
+    initCudaEvents();
+
+    vector<int> gridSizes;
+    vector<Metrics> performanceResults;
+
+    vector<ValidationMetrics> validationResults;
+    vector<string> validationModelNames;
+
+    cout << "\n"
+         << left
+         << setw(10) << "Grid"
+         << setw(14) << "CPU(ms)"
+         << setw(14) << "Global(ms)"
+         << setw(14) << "Tiled(ms)"
+         << setw(14) << "Halo(ms)"
+         << setw(12) << "Global SP"
+         << setw(12) << "Tiled SP"
+         << setw(12) << "Halo SP"
+         << "\n";
+
+    cout << string(106, '-') << "\n";
+
+    for(const int N : cfg.sizes)
+    {
+        vector<float> T;
+        vector<float> Tnew;
+        initializeGrid(T, Tnew, N);
+
+        vector<float> finalCPU;
+        vector<float> finalGlobal;
+        vector<float> finalTiled;
+        vector<float> finalHalo;
+
+        const double cpu_ms =
+            benchmarkCPU(cfg, N, T, Tnew, heatProfile, finalCPU);
+
+        const double global_ms =
+            benchmarkGPU(cfg, N, T, heatProfile, finalGlobal);
+
+        const double tiled_ms =
+            benchmarkTiled(cfg, N, T, heatProfile, finalTiled);
+
+        const double halo_ms =
+            benchmarkHalo(cfg, N, T, heatProfile, finalHalo);
+
+        Metrics m = computeMetrics(
+            cfg.modelVersion,
+            N,
+            cfg.steps,
+            cpu_ms,
+            global_ms,
+            tiled_ms,
+            halo_ms
+        );
+
+        cout << fixed << setprecision(4)
+             << left
+             << setw(10) << N
+             << setw(14) << m.cpu_ms
+             << setw(14) << m.gpu_ms
+             << setw(14) << m.tiled_ms
+             << setw(14) << m.halo_ms
+             << setw(12) << m.gpu_speedup
+             << setw(12) << m.tiled_speedup
+             << setw(12) << m.halo_speedup
+             << "\n";
+
+        gridSizes.push_back(N);
+        performanceResults.push_back(m);
+
+        // Validate the Global CUDA result against the CPU reference.
+        if(!finalCPU.empty() && !finalGlobal.empty())
+        {
+            ValidationMetrics validation =
+                calculateValidationMetrics(finalCPU, finalGlobal);
+
+            validationResults.push_back(validation);
+            validationModelNames.push_back("MODEL_V5");
+
+            cout << "\nCPU vs Global CUDA Validation"
+                 << " | Grid: " << N << " x " << N << "\n";
+
+            cout << "RMSE (C)       : "
+                 << scientific << validation.rmse << "\n";
+            cout << "Max Error (C)  : "
+                 << validation.maxAbsoluteError << "\n";
+            cout << "Mean Error (C) : "
+                 << validation.meanAbsoluteError << "\n";
+            cout << "Relative Error : "
+                 << validation.relativeError << "\n\n";
+
+            cout << fixed;
+        }
+    }
+
+    if(cfg.saveCSV)
+    {
+        saveResultsCSV(
+            gridSizes,
+            performanceResults,
+            "MODEL_V5_GPU_BENCHMARK"
+        );
+
+        if(!validationResults.empty())
+        {
+            const string validationFilename =
+                string(RESULT_DIR) +
+                "validation_MODEL_V5_GPU_BENCHMARK.csv";
+
+            saveValidationMetricsCSV(
+                validationFilename,
+                validationModelNames,
+                gridSizes,
+                validationResults
+            );
+        }
+    }
+
+    cleanupCudaEvents();
+
+    cout << "\n=====================================\n";
+    cout << "GPU PERFORMANCE BENCHMARK SUMMARY\n";
+    cout << "=====================================\n";
+    cout << "Model                 : V5\n";
+    cout << "Implementations       : CPU, Global, Tiled, Halo\n";
+    cout << "Grid configurations   : " << gridSizes.size() << "\n";
+    cout << "CSV output             : "
+         << (cfg.saveCSV ? "Enabled" : "Disabled") << "\n";
+    cout << "=====================================\n";
+    cout << "GPU PERFORMANCE BENCHMARK COMPLETE\n";
+    cout << "=====================================\n";
+}
+
 int main(int argc, char* argv[])
 {
     //--------------------------------------------------
@@ -1287,6 +1459,7 @@ int main(int argc, char* argv[])
     // 3 = Physics vs Base AI vs Hybrid comparison
     // 4 = Stateful closed-loop Digital Twin test
     // 5 = Run all Digital Twin tests
+    // 6 = V5 CPU vs CUDA Global/Tiled/Halo performance benchmark
     int selection = 0;
 
     cout << "\n=====================================\n";
@@ -1297,6 +1470,7 @@ int main(int argc, char* argv[])
     cout << "3. Digital Twin - Physics / Base AI / Hybrid comparison\n";
     cout << "4. Digital Twin - Stateful closed-loop test\n";
     cout << "5. Run all Digital Twin tests\n";
+    cout << "6. GPU Performance Benchmark (CPU vs Global vs Tiled vs Halo)\n";
     cout << "Select mode: ";
 
     // Colab/non-interactive execution: pass the selection as an argument,
@@ -1311,14 +1485,14 @@ int main(int argc, char* argv[])
 
             if(parsedChars != std::string(argv[1]).length())
             {
-                cerr << "Invalid argument. Use ./thermal 1, 2, 3, 4, or 5."
+                cerr << "Invalid argument. Use ./thermal 1, 2, 3, 4, 5, or 6."
                      << endl;
                 return 1;
             }
         }
         catch(const std::exception&)
         {
-            cerr << "Invalid argument. Use ./thermal 1, 2, 3, 4, or 5."
+            cerr << "Invalid argument. Use ./thermal 1, 2, 3, 4, 5, or 6."
                  << endl;
             return 1;
         }
@@ -1333,10 +1507,17 @@ int main(int argc, char* argv[])
         }
     }
 
-    if(selection < 1 || selection > 5)
+    if(selection < 1 || selection > 6)
     {
-        cerr << "Invalid selection. Please enter a number from 1 to 5." << endl;
+        cerr << "Invalid selection. Please enter a number from 1 to 6." << endl;
         return -1;
+    }
+
+    // Option 6 is handled separately so it does not enter the Digital Twin path.
+    if(selection == 6)
+    {
+        runGPUPerformanceBenchmark(cfg);
+        return 0;
     }
 
     if(selection >= 2)
