@@ -544,12 +544,6 @@ These CUDA solver results are reported separately from the AI inference benchmar
 
 ## 17. Paper
 
-This repository accompanies the paper:
-
-**Vallinath S. and Binod Kumar,  
-"GPU-Accelerated Physics-AI Thermal Digital Twins: A Scalable Scientific Computing Framework,"  
-AI-SPC, 2026.**
-
 The repository provides the implementation and experimental artifacts supporting the reported:
 
 - Physics-AI prediction
