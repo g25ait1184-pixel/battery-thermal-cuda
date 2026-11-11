@@ -529,44 +529,27 @@ The exact execution commands for individual experiments depend on the source fil
 
 ---
 
-## 16. Execution Timing: Stage-Level Results and End-to-End Measurement
+## 16. Execution Timing
 
-The timing results in this repository were collected from separate experiments using different workloads and measurement procedures. They are therefore reported as **stage-level or workload-specific measurements**, not as one combined application runtime. In particular, the per-prediction AI values below are batch-amortized measurements and should not be interpreted as isolated single-request latency.
+### 16.1 End-to-End Digital Twin Execution Performance
 
-### 16.1 Available stage-level measurements
+The end-to-end execution performance of the proposed Physics–AI Digital Twin was evaluated using a ten-step stateful trajectory. The evaluation completed in **13.4902 ms**, comprising five Hybrid AI steps and five V5 physics steps, corresponding to 50% Hybrid AI utilization.
 
-| Component / workload | Reported timing | Measurement context |
-|---|---:|---|
-| V5 CUDA physics dataset generation | 0.906417 ms/case | Arithmetic average derived from 181.283426 ms of recorded physics simulation time across 200 dataset-generation cases |
-| Base AI GPU inference | 0.000962 ms/prediction | Median CUDA-event time for a batch of 200 predictions, divided by 200; batch-amortized time per prediction |
-| Hybrid AI GPU inference | 0.001802 ms/prediction | Median CUDA-event time for a batch of 200 predictions, divided by 200; batch-amortized time per prediction |
-| V5 CUDA Halo solver | 18.47 ms | Recorded V5 solver benchmark result at 2048 × 2048; a separate spatial-solver workload |
+| **Execution metric** | **Reported result** |
+|---|---:|
+| Total execution time | **13.4902 ms** |
+| Total evaluation steps | 10 |
+| Hybrid AI steps | 5 |
+| V5 physics steps | 5 |
+| Hybrid AI utilization | 50% |
+| Average Hybrid AI step runtime | 0.0190 ms |
+| Average V5 physics step runtime | 2.6790 ms |
 
-The Base AI and Hybrid AI inference measurements were performed on an NVIDIA Tesla T4 using 50 warm-up runs and 500 measurement runs. CUDA events were used to time batch inference, with each measured batch containing 200 predictions. The reported per-prediction values are calculated by dividing the median batch time by 200. They represent amortized batch execution time, not the latency of an independently submitted single prediction. These timings exclude preprocessing and host-to-device transfer.
+Hybrid AI was selected for the first five steps. Physics fallback was activated at Step 6 when the input current exceeded the validated range and continued through Step 10 because the physical thermal-state guard remained exceeded.
 
-The V5 physics value is an average derived from the recorded dataset-generation simulation time. It was not measured in the same repeated CUDA-event inference procedure used for the AI models. The 18.47 ms Halo value belongs to the separate V5 spatial thermal-solver benchmark at a 2048 × 2048 grid. It is not an AI inference time and must not be treated as a directly comparable per-case timing.
+The measured Hybrid AI step runtime was lower than the V5 physics step runtime in this evaluation. However, the two execution paths perform different computational tasks: Hybrid AI predicts scalar maximum temperature, whereas the V5 physics solver maintains and computes the spatial thermal field. Therefore, these measurements represent the execution performance of the implemented paths in the tested trajectory and should not be interpreted as a like-for-like computational speedup.
 
-### 16.2 End-to-end timing status
-
-A measured end-to-end runtime is available for the ten-step stateful Digital Twin evaluation. The complete ten-step execution took **13.4902 ms** and comprised five Hybrid AI steps and five V5 CUDA physics steps.
-
-| Execution scenario | End-to-end wall time | Execution breakdown | Notes |
-|---|---:|---|---|
-| Ten-step stateful Digital Twin evaluation | **13.4902 ms** | 5 Hybrid AI steps + 5 V5 physics steps | 50% Hybrid AI utilization |
-| Normal V1–V5 execution | To be measured | Record selected workloads | Record GPU and system |
-| Automatic validity-aware routing (other trajectories) | To be measured | Record input trajectory and routing decisions | Record GPU and system |
-| Physics / Base AI / Hybrid comparison | To be measured | Record model-loading and warm-up policy | Record GPU and system |
-
-For the reported ten-step stateful run, the average measured step runtimes were **0.0190 ms per Hybrid AI step** and **2.6790 ms per V5 physics step**. These are per-step averages for this particular evaluation, not replacements for the separate batch-inference and solver microbenchmark measurements in Section 16.1.
-
-The ten-step total is consistent with the reported step averages:
-`(5 × 0.0190 ms) + (5 × 2.6790 ms) = 13.4900 ms` (approximately 13.4902 ms; the small difference is due to rounding of the displayed per-step averages).
-
-The result demonstrates lower measured per-step execution time for Hybrid AI than for the V5 physics path in this tested trajectory. It should not be interpreted as a universal application speedup: the two paths perform different amounts and types of computation, and the result applies to this specific stateful test and its measurement configuration.
-
-A complete end-to-end measurement for every application mode—including all startup, model-loading, input preparation, initialization, synchronization, routing, and output/file-handling costs—has not yet been reported. Use the wall-clock procedure in Section 7.8 for the remaining scenarios. Record the selected menu option, hardware, input trajectory, and whether startup, model loading, warm-up, and output/file operations are included.
-
-Do not calculate end-to-end runtime by adding stage-level measurements collected under different workloads, timing methods, or inclusion boundaries.
+The ten-step evaluation demonstrates validity-aware switching between AI-based prediction and physics-based fallback within the proposed Digital Twin framework.
 
 ---
 
@@ -589,19 +572,14 @@ MAE improvement:    15.37%
 
 The performance benchmark used the same 200 held-out cases and the seed-42 Base and Residual checkpoints.
 
-| Method | RMSE (°C) | MAE (°C) | R² | Runtime per case (ms) |
-|---|---:|---:|---:|---:|
-| V5 Physics CUDA | — | — | — | 0.906417 |
-| Base AI GPU | 0.205296 | 0.159564 | 0.999484 | 0.000962 |
-| Hybrid AI GPU | 0.183997 | 0.142309 | 0.999585 | 0.001802 |
-
-The V5 runtime is the arithmetic average of the recorded dataset-generation simulation times (181.283426 ms across 200 cases). Base AI and Hybrid AI values are the median CUDA-event times for batches of 200 predictions, divided by 200. AI timing used 50 warm-up runs and 500 measurement runs on an NVIDIA Tesla T4. The AI values are batch-amortized time per prediction, not isolated single-prediction latency.
+| Method | RMSE (°C) | MAE (°C) | R² |
+|---|---:|---:|---:|
+| Base AI GPU | 0.205296 | 0.159564 | 0.999484 |
+| Hybrid AI GPU | 0.183997 | 0.142309 | 0.999585 |
 
 The Hybrid AI improved seed-42 RMSE by 10.37% and MAE by 10.81% relative to Base AI.
 
-The physics accuracy columns are intentionally left blank because V5 physics supplies the reference targets; comparing the solver against its own generated targets would be a self-reference, not independent accuracy validation.
-
-**Timing caveat:** The physics runtimes were recorded during dataset simulation, whereas AI timings were measured in a separate repeated inference benchmark. Ratios derived from these values are indicative reference-runtime comparisons, not controlled end-to-end application speedups. The AI timing is batch inference only and excludes preprocessing and host-to-device transfer. Its per-prediction value is amortized across a batch of 200 predictions.
+The physics accuracy columns are intentionally left blank in physics-versus-AI comparisons because V5 physics supplies the reference targets; comparing the solver against its own generated targets would be a self-reference, not independent accuracy validation.
 
 ### 17.3 Stateful Digital Twin routing and execution timing
 
@@ -635,8 +613,8 @@ Largest grid:             2048 × 2048
 CPU runtime:              22422.88 ms
 GPU global runtime:       24.41 ms
 Tiled runtime:            20.44 ms
-Halo runtime:             18.47 ms
-Halo speedup:             1214.18×
+Halo runtime:             18.46 ms
+Halo speedup:             1214.1×
 CPU–GPU RMSE:             1.84 × 10⁻⁶ °C
 ```
 
